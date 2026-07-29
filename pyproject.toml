@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cdmx-bayesopt"
+version = "0.1.0"
+description = "Lightweight 2-D Bayesian optimization for the CDMX Radxa workshop"
+readme = "README.en.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "Aspuru-Guzik Group"}]
+dependencies = ["numpy>=1.24,<3"]
+
+[project.optional-dependencies]
+visual = ["matplotlib>=3.7,<4", "Pillow>=10,<13"]
+dev = []
+
+[project.scripts]
+cdmx-bayesopt = "cdmx_bayesopt.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
