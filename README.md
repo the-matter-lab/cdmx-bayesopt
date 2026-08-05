@@ -33,6 +33,72 @@ Para cambiar el puerto o acortar la demostración:
 ./scripts/run-demo.sh --port 8080 --iterations 15
 ```
 
+## Laboratorio de color: TCS34725 + NeoPixel
+
+El repositorio incluye una segunda aplicación web, independiente del panel de
+BayesOpt, que grafica en vivo los canales rojo, verde y azul del TCS34725 y
+controla los 24 bits de color del NeoPixel (0–255 por canal) junto con su
+brillo. Se abre en `http://equipoN.local:8010/`.
+
+### Cableado para la ZERO 3W
+
+| Dispositivo | Señal | Pin físico de la Radxa | Función |
+|---|---|---:|---|
+| Gravity TCS34725 | VCC | 1 | 3.3 V |
+| Gravity TCS34725 | GND | 6 | Tierra |
+| Gravity TCS34725 | SDA | 27 | `I2C4_SDA_M0` |
+| Gravity TCS34725 | SCL | 28 | `I2C4_SCL_M0` |
+| NeoPixel | VCC | 2 o 4 | 5 V |
+| NeoPixel | GND | 6 | Tierra común |
+| NeoPixel | DIN | **19** | `SPI3_MOSI_M1` |
+
+**Mueva el cable DIN del NeoPixel del pin físico 3 al pin 19.** Radxa indica
+que el pin 3 tiene una resistencia pull-up adicional para I²C y puede funcionar
+de manera anormal como GPIO. Además, un WS2812 necesita temporización de
+800 kHz que no es confiable con GPIO desde Python/Linux. El backend incluido
+codifica GRB mediante el periférico SPI de hardware, por eso usa MOSI en el pin
+19. Es recomendable colocar un conversor lógico 74AHCT125 o 74HCT245 entre la
+salida de 3.3 V y DIN, especialmente si el NeoPixel se alimenta con 5 V.
+
+Antes de instalar, ejecute `sudo rsetup`, active los overlays `I2C4-M0` y
+`SPI3-M1`, y reinicie. Después confirme que existen los dispositivos:
+
+```bash
+ls -l /dev/i2c-4 /dev/spidev3.0
+sudo i2cdetect -y 4
+# debe aparecer 29
+```
+
+Instale la aplicación y su servicio de arranque automático desde el clon hecho
+por cada equipo:
+
+```bash
+git clone https://github.com/aspuru-guzik-group/cdmx-bayesopt.git
+cd cdmx-bayesopt
+./scripts/install-color-lab.sh
+```
+
+El servicio conserva cinco minutos de lecturas en memoria, no escribe datos en
+la tarjeta SD y vuelve a arrancar después de apagar/encender la placa. Para ver
+su estado:
+
+```bash
+systemctl status cdmx-color-lab
+journalctl -u cdmx-color-lab -n 100 --no-pager
+```
+
+También puede probar toda la interfaz sin hardware:
+
+```bash
+./scripts/run-color-lab.sh --simulate
+# abra http://localhost:8010/
+```
+
+La API local expone `GET /api/state`, `GET /api/health` y
+`POST /api/led` con `{"color":"#RRGGBB","brightness":0.0}`. No tiene
+autenticación y el instalador abre el puerto 8010 solamente a rangos de red
+privados; no lo exponga directamente a Internet.
+
 ## Ejecutar sin gráfica
 
 Este modo funciona con la instalación mínima de NumPy y consume menos memoria:
@@ -42,7 +108,7 @@ source .venv/bin/activate
 cdmx-bayesopt \
   --iterations 25 \
   --no-plot \
-  --output runs/equipo1
+  --output runs/equipo0
 ```
 
 Los resultados aparecen en el directorio indicado:
@@ -115,3 +181,8 @@ publicado con licencia MIT. Esta es una implementación nueva y compacta: no
 incluye sus datos, cuadernos, firmware ni dependencias Ax/PyTorch. Consulte
 [`NOTICE.md`](NOTICE.md) para la atribución y [`LICENSE`](LICENSE) para la
 licencia de este repositorio.
+
+Referencias de hardware: [pinout oficial de Radxa ZERO 3W](https://docs.radxa.com/zero/zero3/hardware-design/hardware-interface),
+[Gravity TCS34725 de DFRobot](https://wiki.dfrobot.com/sen0212/),
+[sensores TCS34725 y WS2812B en Radxa](https://docs.radxa.com/en/rock3/rock3a/app-development/sensor)
+y [prácticas eléctricas para NeoPixel de Adafruit](https://learn.adafruit.com/adafruit-neopixel-uberguide/best-practices).

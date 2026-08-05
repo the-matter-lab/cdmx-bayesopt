@@ -1,0 +1,27 @@
+[Unit]
+Description=CDMX TCS34725 and NeoPixel color laboratory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@@USER@@
+Group=@@GROUP@@
+SupplementaryGroups=i2c spi
+WorkingDirectory=@@ROOT@@
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=@@ROOT@@/.venv/bin/cdmx-color-lab --host 0.0.0.0 --port 8010 --i2c-bus 4 --spi-bus 3 --spi-device 0
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

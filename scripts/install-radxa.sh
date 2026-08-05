@@ -11,7 +11,8 @@ fi
 
 "${SUDO[@]}" apt-get update
 "${SUDO[@]}" apt-get install -y \
-  python3-venv python3-pip python3-numpy python3-matplotlib python3-pil
+  i2c-tools python3-venv python3-pip python3-numpy python3-matplotlib \
+  python3-pil python3-smbus python3-spidev
 
 python3 -m venv --system-site-packages "$ROOT/.venv"
 "$ROOT/.venv/bin/python" -m pip install --no-deps --editable "$ROOT"
