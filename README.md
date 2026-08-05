@@ -23,6 +23,26 @@ cd cdmx-bayesopt
 ./scripts/run-demo.sh
 ```
 
+### Descargar sin una cuenta de GitHub
+
+Este repositorio es público. Los participantes **no necesitan una cuenta de
+GitHub ni iniciar sesión** para ejecutar el comando `git clone` anterior.
+
+Si una Radxa no tiene Git instalado, también se puede descargar una copia de
+la rama `main` con `wget`:
+
+```bash
+wget -O cdmx-bayesopt.tar.gz \
+  https://github.com/aspuru-guzik-group/cdmx-bayesopt/archive/refs/heads/main.tar.gz
+tar -xzf cdmx-bayesopt.tar.gz
+cd cdmx-bayesopt-main
+```
+
+Después ejecute `./scripts/install-radxa.sh` para la demostración de BayesOpt o
+`./scripts/install-color-lab.sh` para instalar el laboratorio de color como
+servicio automático. La descarga con `wget` no incluye el historial de Git; para
+actualizarla se debe descargar y extraer otra vez.
+
 Abra `http://equipoN.local:8000/` desde una computadora o teléfono conectado a
 la misma LAN; cambie `N` por el número del equipo. La página se actualiza sola.
 Use `Ctrl-C` en la terminal para detener el servidor.
