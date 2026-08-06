@@ -17,7 +17,7 @@ the next experiment. The optimizer itself depends only on NumPy.
 On RadxaOS/Debian 12:
 
 ```bash
-git clone https://github.com/aspuru-guzik-group/cdmx-bayesopt.git
+git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
 cd cdmx-bayesopt
 ./scripts/install-radxa.sh
 ./scripts/run-demo.sh
@@ -33,7 +33,7 @@ branch with `wget` instead:
 
 ```bash
 wget -O cdmx-bayesopt.tar.gz \
-  https://github.com/aspuru-guzik-group/cdmx-bayesopt/archive/refs/heads/main.tar.gz
+  https://github.com/the-matter-lab/cdmx-bayesopt/archive/refs/heads/main.tar.gz
 tar -xzf cdmx-bayesopt.tar.gz
 cd cdmx-bayesopt-main
 ```
@@ -92,7 +92,7 @@ sudo i2cdetect -y 4
 Install the app and its automatic boot service from each team's clone:
 
 ```bash
-git clone https://github.com/aspuru-guzik-group/cdmx-bayesopt.git
+git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
 cd cdmx-bayesopt
 ./scripts/install-color-lab.sh
 ```
@@ -170,7 +170,7 @@ controlling real equipment.
 
 ## Workshop integration
 
-[`cdmx-local-ai`](https://github.com/aspuru-guzik-group/cdmx-local-ai) prepares
+[`cdmx-local-ai`](https://github.com/the-matter-lab/cdmx-local-ai) prepares
 the ten cards and shared desktop. This repository contains the demonstration
 that each team can clone, modify, and connect to its own experiment. The
 default candidate count and plot size are deliberately bounded to run

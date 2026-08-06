@@ -17,7 +17,7 @@ siguiente experimento. Solo necesita NumPy para ejecutar la optimización.
 En RadxaOS/Debian 12:
 
 ```bash
-git clone https://github.com/aspuru-guzik-group/cdmx-bayesopt.git
+git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
 cd cdmx-bayesopt
 ./scripts/install-radxa.sh
 ./scripts/run-demo.sh
@@ -33,7 +33,7 @@ la rama `main` con `wget`:
 
 ```bash
 wget -O cdmx-bayesopt.tar.gz \
-  https://github.com/aspuru-guzik-group/cdmx-bayesopt/archive/refs/heads/main.tar.gz
+  https://github.com/the-matter-lab/cdmx-bayesopt/archive/refs/heads/main.tar.gz
 tar -xzf cdmx-bayesopt.tar.gz
 cd cdmx-bayesopt-main
 ```
@@ -93,7 +93,7 @@ Instale la aplicación y su servicio de arranque automático desde el clon hecho
 por cada equipo:
 
 ```bash
-git clone https://github.com/aspuru-guzik-group/cdmx-bayesopt.git
+git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
 cd cdmx-bayesopt
 ./scripts/install-color-lab.sh
 ```
@@ -173,7 +173,7 @@ estado seguro al controlar equipo real.
 
 ## Cómo encaja en el taller
 
-[`cdmx-local-ai`](https://github.com/aspuru-guzik-group/cdmx-local-ai) prepara
+[`cdmx-local-ai`](https://github.com/the-matter-lab/cdmx-local-ai) prepara
 las diez tarjetas y el escritorio compartido. Este repositorio contiene la
 demostración que cada equipo puede clonar, modificar y conectar a su propio
 experimento. La configuración predeterminada limita el número de candidatos y
