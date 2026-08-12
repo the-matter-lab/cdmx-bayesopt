@@ -28,11 +28,13 @@
 	fragment@2 {
 		target = <&pinctrl>;
 		__overlay__ {
-			cdmx_i2c_gpio_pins: cdmx-i2c-gpio-pins {
-				/* bank 0, RK_PD1/RK_PD0 (25/24), GPIO function */
-				rockchip,pins =
-					<0 25 0 &pcfg_pull_up>,
-					<0 24 0 &pcfg_pull_up>;
+			cdmx-i2c-gpio {
+				cdmx_i2c_gpio_pins: cdmx-i2c-gpio-pins {
+					/* bank 0, RK_PD1/RK_PD0 (25/24), GPIO function */
+					rockchip,pins =
+						<0 25 0 &pcfg_pull_up>,
+						<0 24 0 &pcfg_pull_up>;
+				};
 			};
 		};
 	};

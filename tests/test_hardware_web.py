@@ -58,6 +58,10 @@ class FakeSpi:
 
 
 class HardwareTests(unittest.TestCase):
+    def test_rockchip_pinctrl_pins_are_nested_inside_a_function_group(self):
+        overlay = (Path(__file__).parents[1] / "deploy" / "cdmx-zero3w-i2c-gpio.dts").read_text()
+        self.assertIn("cdmx-i2c-gpio {\n\t\t\t\tcdmx_i2c_gpio_pins:", overlay)
+
     def test_i2c_bus_auto_discovers_named_gpio_adapter(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
