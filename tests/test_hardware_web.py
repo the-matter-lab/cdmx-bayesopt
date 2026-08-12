@@ -131,6 +131,7 @@ class HardwareTests(unittest.TestCase):
         self.assertEqual(pixel.color, (255, 17, 128))
         self.assertEqual(pixel.brightness, 1.0)
         self.assertEqual(spi.max_speed_hz, 2_400_000)
+        self.assertFalse(spi.no_cs)
         self.assertEqual(len(spi.frames[-1]), 57)
         self.assertEqual(spi.frames[-1], encode_ws2812((255, 17, 128), 1.0))
         pixel.close()
