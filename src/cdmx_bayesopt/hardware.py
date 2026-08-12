@@ -292,8 +292,9 @@ class SpiNeoPixel:
         self._spi = factory(self.bus, self.device)
         self._spi.max_speed_hz = self.speed_hz
         self._spi.mode = 0
-        if hasattr(self._spi, "no_cs"):
-            self._spi.no_cs = True
+        # Rockchip's rk-spi driver rejects the optional SPI_NO_CS ioctl with
+        # EINVAL. The NeoPixel is connected only to MOSI, so normal CS activity
+        # on the separate chip-select pin does not alter its data waveform.
         self.set_color(self.color, self.brightness)
 
     def set_color(self, color: RGB, brightness: float) -> None:
