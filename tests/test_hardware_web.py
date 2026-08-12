@@ -62,6 +62,20 @@ class HardwareTests(unittest.TestCase):
         overlay = (Path(__file__).parents[1] / "deploy" / "cdmx-zero3w-i2c-gpio.dts").read_text()
         self.assertIn("cdmx-i2c-gpio {\n\t\t\t\tcdmx_i2c_gpio_pins:", overlay)
 
+    def test_installers_include_system_administration_commands_in_path(self):
+        root = Path(__file__).parents[1]
+        for script in ("install-color-lab.sh", "install-zero3w-hardware.sh"):
+            installer = (root / "scripts" / script).read_text()
+            self.assertIn("/usr/sbin:/usr/bin:/sbin:/bin", installer)
+
+    def test_service_accepts_radxa_and_generic_spi_device_groups(self):
+        root = Path(__file__).parents[1]
+        installer = (root / "scripts" / "install-color-lab.sh").read_text()
+        service = (root / "deploy" / "cdmx-color-lab.service.in").read_text()
+        self.assertIn("groupadd --force --system spidev", installer)
+        self.assertIn("usermod -aG i2c,spi,spidev", installer)
+        self.assertIn("SupplementaryGroups=i2c spi spidev", service)
+
     def test_i2c_bus_auto_discovers_named_gpio_adapter(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

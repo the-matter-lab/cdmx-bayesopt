@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
@@ -21,7 +23,8 @@ SERVICE_GROUP=$(id -gn "$SERVICE_USER")
 
 "${SUDO[@]}" groupadd --force --system i2c
 "${SUDO[@]}" groupadd --force --system spi
-"${SUDO[@]}" usermod -aG i2c,spi "$SERVICE_USER"
+"${SUDO[@]}" groupadd --force --system spidev
+"${SUDO[@]}" usermod -aG i2c,spi,spidev "$SERVICE_USER"
 "${SUDO[@]}" install -m 0644 \
   "$ROOT/deploy/99-cdmx-color-lab.rules" \
   /etc/udev/rules.d/99-cdmx-color-lab.rules

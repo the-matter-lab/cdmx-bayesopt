@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 DTS="$ROOT/deploy/cdmx-zero3w-i2c-gpio.dts"
 MODULE_SOURCE="$ROOT/deploy/kernel/i2c-gpio"
