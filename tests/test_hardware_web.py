@@ -8,7 +8,9 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
+from examples import hardware_objective
 from cdmx_bayesopt.hardware import (
     HardwareBundle,
     MemoryNeoPixel,
@@ -58,6 +60,37 @@ class FakeSpi:
 
 
 class HardwareTests(unittest.TestCase):
+    def test_workshop_objective_controls_led_and_scores_sensor_color(self):
+        self.assertEqual(hardware_objective.color_from_point(-3, 300), (0, 40, 255))
+        self.assertAlmostEqual(
+            hardware_objective.color_error({"red": 55, "green": 15, "blue": 30}),
+            0.0,
+        )
+        with (
+            mock.patch.object(
+                hardware_objective,
+                "request_json",
+                side_effect=[{}, {"readings": [{"red": 55, "green": 15, "blue": 30}]}],
+            ) as request,
+            mock.patch.object(hardware_objective.time, "sleep") as sleep,
+        ):
+            self.assertAlmostEqual(hardware_objective.measure(12, 220), 0.0)
+        request.assert_any_call(
+            "/api/led",
+            {"red": 12, "green": 40, "blue": 220, "brightness": 0.20},
+        )
+        request.assert_any_call("/api/state")
+        sleep.assert_called_once_with(0.8)
+
+    def test_color_campaign_uses_two_led_dimensions_and_lan_dashboard(self):
+        root = Path(__file__).parents[1]
+        campaign = (root / "scripts" / "run-color-campaign.sh").read_text()
+        installer = (root / "scripts" / "install-color-lab.sh").read_text()
+        self.assertIn("--objective \"$ROOT/examples/hardware_objective.py:measure\"", campaign)
+        self.assertIn("--lower 0 --upper 255", campaign)
+        self.assertIn("--serve --port 8000", campaign)
+        self.assertIn('port 8000 proto tcp', installer)
+
     def test_rockchip_pinctrl_pins_are_nested_inside_a_function_group(self):
         overlay = (Path(__file__).parents[1] / "deploy" / "cdmx-zero3w-i2c-gpio.dts").read_text()
         self.assertIn("cdmx-i2c-gpio {\n\t\t\t\tcdmx_i2c_gpio_pins:", overlay)

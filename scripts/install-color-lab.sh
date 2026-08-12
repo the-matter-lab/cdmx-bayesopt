@@ -45,6 +45,8 @@ sed -e "s|@@ROOT@@|$escaped_root|g" \
 
 if command -v ufw >/dev/null 2>&1; then
   for subnet in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+    "${SUDO[@]}" ufw allow from "$subnet" to any port 8000 proto tcp \
+      comment 'CDMX BayesOpt campaign' >/dev/null
     "${SUDO[@]}" ufw allow from "$subnet" to any port 8010 proto tcp \
       comment 'CDMX color lab' >/dev/null
   done

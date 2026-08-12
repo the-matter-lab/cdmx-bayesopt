@@ -12,21 +12,45 @@ El programa **minimiza** una medición escalar. Primero prueba algunos puntos al
 azar; después ajusta un proceso gaussiano y usa mejora esperada para decidir el
 siguiente experimento. Solo necesita NumPy para ejecutar la optimización.
 
-## Inicio rápido en la Radxa
+## Flujo del taller en la Radxa
 
-En RadxaOS/Debian 12:
+Abra `Terminal` en el escritorio `BAYES`. En la imagen CDMX la terminal ya
+comienza dentro de `~/workspace`:
 
 ```bash
-git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
+./get-bayesopt-code
 cd cdmx-bayesopt
-./scripts/install-radxa.sh
+./scripts/install-color-lab.sh
+```
+
+Abra `http://equipoN.local:8010/`: ahí puede cambiar el NeoPixel y ver las tres
+curvas del TCS34725. Después abra `examples/hardware_objective.py` con `Code`;
+las cuatro constantes para el ejercicio están juntas al principio. Ejecute:
+
+```bash
+./scripts/run-color-campaign.sh
+```
+
+BayesOpt controla rojo y azul, deja verde fijo y minimiza la distancia entre el
+color medido y `TARGET_RGB`. Siga la campaña en
+`http://equipoN.local:8000/`; el puerto 8010 permanece abierto para mostrar el
+LED y las lecturas físicas. `Ctrl-C` detiene la campaña, no el laboratorio.
+
+La demostración puramente simulada sigue disponible:
+
+```bash
 ./scripts/run-demo.sh
 ```
 
 ### Descargar sin una cuenta de GitHub
 
-Este repositorio es público. Los participantes **no necesitan una cuenta de
-GitHub ni iniciar sesión** para ejecutar el comando `git clone` anterior.
+El repositorio es público y `./get-bayesopt-code` no requiere cuenta. En una
+Radxa que no tenga la imagen CDMX use `git clone`:
+
+```bash
+git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
+cd cdmx-bayesopt
+```
 
 Si una Radxa no tiene Git instalado, también se puede descargar una copia de
 la rama `main` con `wget`:
@@ -38,20 +62,9 @@ tar -xzf cdmx-bayesopt.tar.gz
 cd cdmx-bayesopt-main
 ```
 
-Después ejecute `./scripts/install-radxa.sh` para la demostración de BayesOpt o
-`./scripts/install-color-lab.sh` para instalar el laboratorio de color como
-servicio automático. La descarga con `wget` no incluye el historial de Git; para
-actualizarla se debe descargar y extraer otra vez.
-
-Abra `http://equipoN.local:8000/` desde una computadora o teléfono conectado a
-la misma LAN; cambie `N` por el número del equipo. La página se actualiza sola.
-Use `Ctrl-C` en la terminal para detener el servidor.
-
-Para cambiar el puerto o acortar la demostración:
-
-```bash
-./scripts/run-demo.sh --port 8080 --iterations 15
-```
+La descarga con `wget` no incluye historial de Git. Ejecute
+`./scripts/install-color-lab.sh` después de descargar cualquiera de las dos
+formas.
 
 ## Laboratorio de color: TCS34725 + NeoPixel
 
@@ -160,33 +173,21 @@ El generador es determinista para una misma semilla. Cambie `--seed` para una
 campaña diferente y use `--lower`/`--upper` para modificar los límites de las
 dos variables.
 
-## Conectar un experimento real
+## Modificar el experimento físico
 
-Copie [`examples/hardware_objective.py`](examples/hardware_objective.py) y
-reemplace el cuerpo de `measure(x1, x2)`. La función puede controlar GPIO,
-serial, HTTP o MQTT, esperar a que se estabilice el sistema y debe devolver una
-sola medición numérica finita:
-
-```python
-def measure(x1: float, x2: float) -> float:
-    enviar_parametros_al_equipo(x1, x2)
-    return leer_sensor()
-```
-
-El ejemplo incluido se puede ejecutar sin hardware:
+[`examples/hardware_objective.py`](examples/hardware_objective.py) ya es un
+experimento completo. Usa la API local del puerto 8010 para encender el LED,
+espera al TCS34725 y devuelve una medición escalar. `x1` controla rojo, `x2`
+controla azul y `GREEN` permanece fijo. Para el taller basta modificar
+`TARGET_RGB`, `GREEN`, `BRIGHTNESS` o `SETTLE_SECONDS` y volver a ejecutar:
 
 ```bash
-source .venv/bin/activate
-cdmx-bayesopt \
-  --objective examples/hardware_objective.py:measure \
-  --iterations 20 \
-  --gif \
-  --output runs/hardware
+./scripts/run-color-campaign.sh
 ```
 
-Si el objetivo se debe **maximizar**, devuelva el negativo de la medición. El
-callback corre dentro del proceso del optimizador: agregue tiempos máximos y un
-estado seguro al controlar equipo real.
+La función `measure(x1, x2)` queda deliberadamente corta y se puede sustituir
+por otro experimento HTTP, GPIO, serial o MQTT. BayesOpt siempre minimiza; para
+maximizar una señal devuelva su negativo.
 
 ## Cómo encaja en el taller
 

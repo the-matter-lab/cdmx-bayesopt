@@ -12,21 +12,45 @@ The program **minimizes** one scalar measurement. It first tries a few random
 points, then fits a Gaussian process and uses expected improvement to choose
 the next experiment. The optimizer itself depends only on NumPy.
 
-## Quick start on the Radxa
+## Workshop flow on the Radxa
 
-On RadxaOS/Debian 12:
+Open `Terminal` on the `BAYES` desktop. On the CDMX image it starts inside
+`~/workspace`:
 
 ```bash
-git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
+./get-bayesopt-code
 cd cdmx-bayesopt
-./scripts/install-radxa.sh
+./scripts/install-color-lab.sh
+```
+
+Open `http://equipoN.local:8010/` to change the NeoPixel and watch all three
+TCS34725 curves. Then open `examples/hardware_objective.py` in `Code`; the four
+workshop constants are together near the top. Run:
+
+```bash
+./scripts/run-color-campaign.sh
+```
+
+BayesOpt controls red and blue, keeps green fixed, and minimizes the distance
+between the measured color and `TARGET_RGB`. Follow the campaign at
+`http://equipoN.local:8000/`; port 8010 remains available for the physical LED
+and sensor readings. `Ctrl-C` stops the campaign, not the color lab.
+
+The fully simulated demonstration remains available:
+
+```bash
 ./scripts/run-demo.sh
 ```
 
 ### Download without a GitHub account
 
-This repository is public. Participants **do not need a GitHub account or need
-to sign in** to run the `git clone` command above.
+The repository is public and `./get-bayesopt-code` needs no account. On a Radxa
+without the CDMX image, use Git directly:
+
+```bash
+git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
+cd cdmx-bayesopt
+```
 
 If a Radxa does not have Git installed, download a snapshot of the `main`
 branch with `wget` instead:
@@ -38,20 +62,8 @@ tar -xzf cdmx-bayesopt.tar.gz
 cd cdmx-bayesopt-main
 ```
 
-Then run `./scripts/install-radxa.sh` for the BayesOpt demonstration or
-`./scripts/install-color-lab.sh` to install the color laboratory as an
-automatic service. The `wget` download has no Git history; download and extract
-it again when an updated copy is needed.
-
-Open `http://equipoN.local:8000/` from a computer or phone on the same LAN,
-replacing `N` with the team number. The page updates automatically. Press
-`Ctrl-C` in the terminal to stop the server.
-
-To use a different port or run a shorter demonstration:
-
-```bash
-./scripts/run-demo.sh --port 8080 --iterations 15
-```
+The `wget` download has no Git history. Run `./scripts/install-color-lab.sh`
+after downloading with either method.
 
 ## Color laboratory: TCS34725 + NeoPixel
 
@@ -157,33 +169,21 @@ The output directory contains:
 Runs are deterministic for the same seed. Change `--seed` for a different
 campaign and use `--lower`/`--upper` to change both variables' bounds.
 
-## Connect a real experiment
+## Modify the physical experiment
 
-Copy [`examples/hardware_objective.py`](examples/hardware_objective.py) and
-replace the body of `measure(x1, x2)`. The function can control GPIO, serial,
-HTTP, or MQTT, wait for the system to settle, and must return one finite
-numeric measurement:
-
-```python
-def measure(x1: float, x2: float) -> float:
-    send_parameters_to_equipment(x1, x2)
-    return read_sensor()
-```
-
-The included example runs without hardware:
+[`examples/hardware_objective.py`](examples/hardware_objective.py) is already a
+complete experiment. It uses the local port-8010 API to set the LED, waits for
+the TCS34725, and returns one scalar measurement. `x1` controls red, `x2`
+controls blue, and `GREEN` stays fixed. For the workshop, edit `TARGET_RGB`,
+`GREEN`, `BRIGHTNESS`, or `SETTLE_SECONDS`, then rerun:
 
 ```bash
-source .venv/bin/activate
-cdmx-bayesopt \
-  --objective examples/hardware_objective.py:measure \
-  --iterations 20 \
-  --gif \
-  --output runs/hardware
+./scripts/run-color-campaign.sh
 ```
 
-If the objective should be **maximized**, return the negative measurement. The
-callback runs inside the optimizer process; add timeouts and a safe state when
-controlling real equipment.
+The deliberately short `measure(x1, x2)` function can be replaced with another
+HTTP, GPIO, serial, or MQTT experiment. BayesOpt always minimizes; return the
+negative of a signal to maximize it.
 
 ## Workshop integration
 
