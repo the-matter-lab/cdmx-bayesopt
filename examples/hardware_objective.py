@@ -1,17 +1,17 @@
-"""Match a target reflected color by optimizing all three NeoPixel channels."""
+"""Match a target reflected color by controlling I2C/SPI hardware directly."""
 
 from __future__ import annotations
 
-import json
+import atexit
 import os
 import time
-import urllib.request
 
 from cdmx_bayesopt.colors import parse_rgb_color, reflected_rgb
+from cdmx_bayesopt.hardware import HardwareBundle, build_hardware
 
 BRIGHTNESS = 1.0
 SETTLE_SECONDS = 0.8
-COLOR_LAB = "http://127.0.0.1:8010"
+_hardware: HardwareBundle | None = None
 
 
 def color_from_point(red: float, green: float, blue: float) -> tuple[int, int, int]:
@@ -27,32 +27,38 @@ def color_error(reading: dict[str, float], target: tuple[int, int, int]) -> floa
     )
 
 
-def request_json(path: str, payload: dict[str, object] | None = None) -> dict:
-    data = json.dumps(payload).encode() if payload is not None else None
-    request = urllib.request.Request(
-        COLOR_LAB + path,
-        data=data,
-        headers={"Content-Type": "application/json"} if data else {},
-    )
-    with urllib.request.urlopen(request, timeout=5) as response:
-        return json.load(response)
+def hardware() -> HardwareBundle:
+    global _hardware
+    if _hardware is None:
+        candidate = build_hardware(
+            simulate=os.environ.get("CDMX_SIMULATE") == "1",
+            i2c_bus="auto",
+            spi_bus=3,
+            spi_device=0,
+        )
+        if candidate.warnings:
+            candidate.sensor.close()
+            candidate.pixel.close()
+            raise OSError("; ".join(candidate.warnings))
+        _hardware = candidate
+    return _hardware
+
+
+def close_hardware() -> None:
+    global _hardware
+    if _hardware is not None:
+        _hardware.pixel.close()
+        _hardware.sensor.close()
+        _hardware = None
+
+
+atexit.register(close_hardware)
 
 
 def measure(red: float, green: float, blue: float) -> float:
     target = parse_rgb_color(os.environ.get("CDMX_TARGET_RGB", ""))
     color = color_from_point(red, green, blue)
-    request_json(
-        "/api/led",
-        {
-            "red": color[0],
-            "green": color[1],
-            "blue": color[2],
-            "brightness": BRIGHTNESS,
-        },
-    )
+    devices = hardware()
+    devices.pixel.set_color(color, BRIGHTNESS)
     time.sleep(SETTLE_SECONDS)
-    state = request_json("/api/state")
-    readings = state.get("readings", [])
-    if not readings:
-        raise OSError("the color-lab service has no sensor readings")
-    return color_error(readings[-1], target)
+    return color_error(devices.sensor.read().as_dict(), target)

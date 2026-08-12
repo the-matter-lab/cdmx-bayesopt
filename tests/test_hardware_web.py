@@ -13,6 +13,7 @@ from unittest import mock
 from examples import hardware_objective
 from cdmx_bayesopt.colors import parse_rgb_color, reflected_rgb
 from cdmx_bayesopt.hardware import (
+    ColorReading,
     HardwareBundle,
     MemoryNeoPixel,
     SimulatedTCS34725,
@@ -72,38 +73,38 @@ class HardwareTests(unittest.TestCase):
             ),
             0.0,
         )
+        pixel = MemoryNeoPixel()
+        sensor = mock.Mock()
+        sensor.read.return_value = ColorReading(
+            time.time(), 55 * 257, 30 * 257, 100 * 257, 200 * 257
+        )
+        devices = HardwareBundle(sensor, pixel, "test sensor", "test pixel", [])
         with (
             mock.patch.dict("os.environ", {"CDMX_TARGET_RGB": "#371E64"}),
             mock.patch.object(
                 hardware_objective,
-                "request_json",
-                side_effect=[
-                    {},
-                    {
-                        "readings": [
-                            {
-                                "red": 55 * 257,
-                                "green": 30 * 257,
-                                "blue": 100 * 257,
-                            }
-                        ]
-                    },
-                ],
-            ) as request,
+                "build_hardware",
+                return_value=devices,
+            ) as build,
             mock.patch.object(hardware_objective.time, "sleep") as sleep,
         ):
+            hardware_objective.close_hardware()
             self.assertAlmostEqual(hardware_objective.measure(12, 34, 220), 0.0)
-        request.assert_any_call(
-            "/api/led",
-            {"red": 12, "green": 34, "blue": 220, "brightness": 1.0},
+            self.assertEqual(pixel.color, (12, 34, 220))
+            hardware_objective.close_hardware()
+        build.assert_called_once_with(
+            simulate=False, i2c_bus="auto", spi_bus=3, spi_device=0
         )
-        request.assert_any_call("/api/state")
+        sensor.read.assert_called_once_with()
         sleep.assert_called_once_with(0.8)
 
-    def test_color_campaign_uses_three_led_dimensions_and_one_target(self):
+    def test_three_scripts_separate_setup_lab_and_campaign(self):
         root = Path(__file__).parents[1]
-        campaign = (root / "scripts" / "run-color-campaign.sh").read_text()
-        installer = (root / "scripts" / "install-color-lab.sh").read_text()
+        scripts = sorted(path.name for path in (root / "scripts").glob("*.sh"))
+        self.assertEqual(scripts, ["bayesopt.sh", "color-lab.sh", "setup.sh"])
+        campaign = (root / "scripts" / "bayesopt.sh").read_text()
+        installer = (root / "scripts" / "setup.sh").read_text()
+        color_lab = (root / "scripts" / "color-lab.sh").read_text()
         self.assertIn(
             "--objective \"$ROOT/examples/hardware_objective.py:measure\"", campaign
         )
@@ -112,24 +113,24 @@ class HardwareTests(unittest.TestCase):
         self.assertIn("--lower 0 --upper 255", campaign)
         self.assertIn("--serve --port 8000", campaign)
         self.assertIn('port 8000 proto tcp', installer)
+        self.assertIn("exec \"$COLOR_LAB\"", color_lab)
+        self.assertIn("systemctl disable --now cdmx-color-lab.service", installer)
+        self.assertFalse((root / "deploy" / "cdmx-color-lab.service.in").exists())
 
     def test_rockchip_pinctrl_pins_are_nested_inside_a_function_group(self):
         overlay = (Path(__file__).parents[1] / "deploy" / "cdmx-zero3w-i2c-gpio.dts").read_text()
         self.assertIn("cdmx-i2c-gpio {\n\t\t\t\tcdmx_i2c_gpio_pins:", overlay)
 
-    def test_installers_include_system_administration_commands_in_path(self):
+    def test_setup_includes_system_administration_commands_in_path(self):
         root = Path(__file__).parents[1]
-        for script in ("install-color-lab.sh", "install-zero3w-hardware.sh"):
-            installer = (root / "scripts" / script).read_text()
-            self.assertIn("/usr/sbin:/usr/bin:/sbin:/bin", installer)
+        installer = (root / "scripts" / "setup.sh").read_text()
+        self.assertIn("/usr/sbin:/usr/bin:/sbin:/bin", installer)
 
-    def test_service_accepts_radxa_and_generic_spi_device_groups(self):
+    def test_setup_grants_radxa_and_generic_spi_device_groups(self):
         root = Path(__file__).parents[1]
-        installer = (root / "scripts" / "install-color-lab.sh").read_text()
-        service = (root / "deploy" / "cdmx-color-lab.service.in").read_text()
-        self.assertIn("groupadd --force --system spidev", installer)
+        installer = (root / "scripts" / "setup.sh").read_text()
+        self.assertIn("for group in i2c spi spidev", installer)
         self.assertIn("usermod -aG i2c,spi,spidev", installer)
-        self.assertIn("SupplementaryGroups=i2c spi spidev", service)
 
     def test_i2c_bus_auto_discovers_named_gpio_adapter(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

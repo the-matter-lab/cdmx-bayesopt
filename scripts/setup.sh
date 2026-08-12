@@ -3,22 +3,38 @@ set -euo pipefail
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 DTS="$ROOT/deploy/cdmx-zero3w-i2c-gpio.dts"
 MODULE_SOURCE="$ROOT/deploy/kernel/i2c-gpio"
 OVERLAY_NAME=cdmx-zero3w-i2c-gpio
 OVERLAY_DIR=${CDMX_OVERLAY_DIR:-/boot/dtbo}
-MODULES_LOAD_DIR=${CDMX_MODULES_LOAD_DIR:-/etc/modules-load.d}
 SUPPORTED_KERNEL_RELEASE=6.1.84-10-rk2410-nocsf
 
 if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
   SUDO=()
+  INSTALL_USER=${SUDO_USER:-cdmx}
 else
   SUDO=(sudo)
+  INSTALL_USER=$(id -un)
 fi
+getent passwd "$INSTALL_USER" >/dev/null || {
+  printf 'Install user does not exist: %s\n' "$INSTALL_USER" >&2
+  exit 1
+}
+
+"${SUDO[@]}" apt-get update
+"${SUDO[@]}" apt-get install -y \
+  build-essential curl device-tree-compiler i2c-tools kmod \
+  "linux-headers-$(uname -r)" python3-venv python3-pip python3-numpy \
+  python3-matplotlib python3-pil python3-setuptools python3-smbus \
+  python3-spidev python3-wheel
+
+python3 -m venv --system-site-packages "$ROOT/.venv"
+"$ROOT/.venv/bin/python" -m pip install \
+  --no-build-isolation --no-deps --editable "$ROOT"
 
 command -v dtc >/dev/null 2>&1 || {
-  printf 'device-tree-compiler is required; run scripts/install-radxa.sh first.\n' >&2
+  printf 'device-tree-compiler is unavailable after installation.\n' >&2
   exit 69
 }
 [[ -d $OVERLAY_DIR ]] || {
@@ -88,8 +104,7 @@ install_i2c_gpio_module() {
       ;;
   esac
 
-  "${SUDO[@]}" install -d -m 0755 \
-    "/lib/modules/$kernel_release/updates/cdmx"
+  "${SUDO[@]}" install -d -m 0755 "/lib/modules/$kernel_release/updates/cdmx"
   "${SUDO[@]}" install -m 0644 "$module_build_dir/i2c-gpio.ko" \
     "/lib/modules/$kernel_release/updates/cdmx/i2c-gpio.ko"
   "${SUDO[@]}" depmod -a "$kernel_release"
@@ -100,42 +115,69 @@ install_i2c_gpio_module() {
 install_i2c_gpio_module
 
 modules_file=$(mktemp)
-trap 'rm -f -- "$modules_file"' EXIT
-printf 'i2c-dev\ni2c-gpio\n' >"$modules_file"
-"${SUDO[@]}" install -d -m 0755 "$MODULES_LOAD_DIR"
-"${SUDO[@]}" install -m 0644 "$modules_file" \
-  "$MODULES_LOAD_DIR/cdmx-color-lab.conf"
-rm -f -- "$modules_file"
-trap - EXIT
-
 compiled=$(mktemp "${TMPDIR:-/tmp}/$OVERLAY_NAME.XXXXXX.dtbo")
-trap 'rm -f "$compiled"' EXIT
+trap 'rm -f -- "${modules_file:-}" "${compiled:-}"' EXIT
+printf 'i2c-dev\ni2c-gpio\n' >"$modules_file"
+"${SUDO[@]}" install -d -m 0755 /etc/modules-load.d
+"${SUDO[@]}" install -m 0644 "$modules_file" \
+  /etc/modules-load.d/cdmx-color-lab.conf
+
 dtc -q -@ -I dts -O dtb -o "$compiled" "$DTS"
 dtc -q -I dtb -O dts "$compiled" >/dev/null
-
 "${SUDO[@]}" install -m 0644 "$DTS" "$OVERLAY_DIR/$OVERLAY_NAME.dts"
 "${SUDO[@]}" install -m 0644 "$compiled" "$OVERLAY_DIR/$OVERLAY_NAME.dtbo"
 
-# Keep the NeoPixel on hardware SPI3_MOSI_M1 (physical pin 19).
+legacy_i2c="$OVERLAY_DIR/rk3568-i2c4-m0.dtbo"
+if [[ -e $legacy_i2c && ! -e $legacy_i2c.disabled ]]; then
+  "${SUDO[@]}" mv -- "$legacy_i2c" "$legacy_i2c.disabled"
+fi
 spi_overlay=rk3568-spi3-m1-cs0-spidev.dtbo
 if [[ -e $OVERLAY_DIR/$spi_overlay.disabled && ! -e $OVERLAY_DIR/$spi_overlay ]]; then
   "${SUDO[@]}" mv -- "$OVERLAY_DIR/$spi_overlay.disabled" "$OVERLAY_DIR/$spi_overlay"
 fi
 
-if command -v u-boot-update >/dev/null 2>&1; then
-  "${SUDO[@]}" u-boot-update
-else
-  printf 'u-boot-update was not found; enable %s through rsetup.\n' \
-    "$OVERLAY_DIR/$OVERLAY_NAME.dtbo" >&2
+if [[ -r /etc/kernel/cmdline ]]; then
+  read -r -a kernel_args < /etc/kernel/cmdline
+  filtered_kernel_args=()
+  for kernel_arg in "${kernel_args[@]}"; do
+    case "$kernel_arg" in
+      console=ttyFIQ0,*|earlycon|earlycon=*) ;;
+      *) filtered_kernel_args+=("$kernel_arg") ;;
+    esac
+  done
+  printf '%s\n' "${filtered_kernel_args[*]}" | \
+    "${SUDO[@]}" tee /etc/kernel/cmdline >/dev/null
+fi
+command -v u-boot-update >/dev/null 2>&1 || {
+  printf 'u-boot-update was not found on this RadxaOS installation.\n' >&2
   exit 69
+}
+"${SUDO[@]}" u-boot-update
+
+for group in i2c spi spidev; do
+  "${SUDO[@]}" groupadd --force --system "$group"
+done
+"${SUDO[@]}" usermod -aG i2c,spi,spidev "$INSTALL_USER"
+"${SUDO[@]}" install -m 0644 "$ROOT/deploy/99-cdmx-color-lab.rules" \
+  /etc/udev/rules.d/99-cdmx-color-lab.rules
+"${SUDO[@]}" udevadm control --reload-rules
+"${SUDO[@]}" udevadm trigger --subsystem-match=i2c-dev 2>/dev/null || true
+"${SUDO[@]}" udevadm trigger --subsystem-match=spidev 2>/dev/null || true
+
+# Remove the legacy always-on unit from older installs. Hardware support stays
+# enabled at boot; only the web process and sampling are manual.
+"${SUDO[@]}" systemctl disable --now cdmx-color-lab.service 2>/dev/null || true
+"${SUDO[@]}" rm -f /etc/systemd/system/cdmx-color-lab.service
+"${SUDO[@]}" systemctl daemon-reload
+
+if command -v ufw >/dev/null 2>&1; then
+  for subnet in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+    "${SUDO[@]}" ufw allow from "$subnet" to any port 8000 proto tcp \
+      comment 'CDMX BayesOpt campaign' >/dev/null
+    "${SUDO[@]}" ufw allow from "$subnet" to any port 8010 proto tcp \
+      comment 'CDMX Color Lab' >/dev/null
+  done
 fi
 
-"${SUDO[@]}" modprobe i2c-dev
-"${SUDO[@]}" modprobe i2c-gpio
-
-printf 'Installed ZERO 3W pins 8/10 software-I2C and pin 19 SPI overlays.\n'
-if grep -qhs 'i2c-gpio-cdmx' /sys/class/i2c-dev/i2c-*/name; then
-  printf 'The software-I2C adapter is already active; no reboot is required.\n'
-else
-  printf 'Reboot is required before the new I2C adapter appears.\n'
-fi
+printf 'Installed permanent ZERO 3W GPIO support and the local Python app.\n'
+printf 'Reboot once. Then start Color Lab manually with ./scripts/color-lab.sh.\n'
