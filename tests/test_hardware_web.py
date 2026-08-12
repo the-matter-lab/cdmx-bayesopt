@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 from examples import hardware_objective
+from cdmx_bayesopt.colors import parse_rgb_color, reflected_rgb
 from cdmx_bayesopt.hardware import (
     HardwareBundle,
     MemoryNeoPixel,
@@ -61,32 +62,53 @@ class FakeSpi:
 
 class HardwareTests(unittest.TestCase):
     def test_workshop_objective_controls_led_and_scores_sensor_color(self):
-        self.assertEqual(hardware_objective.color_from_point(-3, 300), (0, 40, 255))
+        self.assertEqual(
+            hardware_objective.color_from_point(-3, 128, 300), (0, 128, 255)
+        )
         self.assertAlmostEqual(
-            hardware_objective.color_error({"red": 55, "green": 15, "blue": 30}),
+            hardware_objective.color_error(
+                {"red": 55 * 257, "green": 30 * 257, "blue": 100 * 257},
+                (55, 30, 100),
+            ),
             0.0,
         )
         with (
+            mock.patch.dict("os.environ", {"CDMX_TARGET_RGB": "#371E64"}),
             mock.patch.object(
                 hardware_objective,
                 "request_json",
-                side_effect=[{}, {"readings": [{"red": 55, "green": 15, "blue": 30}]}],
+                side_effect=[
+                    {},
+                    {
+                        "readings": [
+                            {
+                                "red": 55 * 257,
+                                "green": 30 * 257,
+                                "blue": 100 * 257,
+                            }
+                        ]
+                    },
+                ],
             ) as request,
             mock.patch.object(hardware_objective.time, "sleep") as sleep,
         ):
-            self.assertAlmostEqual(hardware_objective.measure(12, 220), 0.0)
+            self.assertAlmostEqual(hardware_objective.measure(12, 34, 220), 0.0)
         request.assert_any_call(
             "/api/led",
-            {"red": 12, "green": 40, "blue": 220, "brightness": 0.20},
+            {"red": 12, "green": 34, "blue": 220, "brightness": 1.0},
         )
         request.assert_any_call("/api/state")
         sleep.assert_called_once_with(0.8)
 
-    def test_color_campaign_uses_two_led_dimensions_and_lan_dashboard(self):
+    def test_color_campaign_uses_three_led_dimensions_and_one_target(self):
         root = Path(__file__).parents[1]
         campaign = (root / "scripts" / "run-color-campaign.sh").read_text()
         installer = (root / "scripts" / "install-color-lab.sh").read_text()
-        self.assertIn("--objective \"$ROOT/examples/hardware_objective.py:measure\"", campaign)
+        self.assertIn(
+            "--objective \"$ROOT/examples/hardware_objective.py:measure\"", campaign
+        )
+        self.assertIn("--dimensions 3", campaign)
+        self.assertIn("export CDMX_TARGET_RGB=$1", campaign)
         self.assertIn("--lower 0 --upper 255", campaign)
         self.assertIn("--serve --port 8000", campaign)
         self.assertIn('port 8000 proto tcp', installer)
@@ -138,6 +160,18 @@ class HardwareTests(unittest.TestCase):
             validate_rgb([0, 256, 1])
         with self.assertRaises(ValueError):
             validate_brightness(-0.1)
+
+    def test_target_color_formats_and_sensor_conversion(self):
+        self.assertEqual(parse_rgb_color("#4A80c0"), (74, 128, 192))
+        self.assertEqual(parse_rgb_color("74, 128, 192"), (74, 128, 192))
+        self.assertEqual(
+            reflected_rgb(
+                {"red": 74 * 257, "green": 128 * 257, "blue": 192 * 257}
+            ),
+            (74, 128, 192),
+        )
+        with self.assertRaises(ValueError):
+            parse_rgb_color("74 128 192")
 
     def test_tcs34725_reads_clear_red_green_blue_words(self):
         bus = FakeBus()
@@ -224,6 +258,8 @@ class WebTests(unittest.TestCase):
         status, html, headers = self.request("/")
         self.assertEqual(status, 200)
         self.assertIn(b"CDMX Color Lab", html)
+        self.assertIn(b"8-bit sensor color", html)
+        self.assertIn(b"target-value", html)
         self.assertIn("nosniff", headers["X-Content-Type-Options"])
         status, payload, _ = self.request(
             "/api/led", {"color": "#0102FE", "brightness": 0.75}

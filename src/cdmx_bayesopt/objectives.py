@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 
-Objective = Callable[[float, float], float]
+Objective = Callable[..., float]
 
 
 def synthetic_surface(points: np.ndarray) -> np.ndarray:
@@ -68,8 +68,8 @@ def load_objective(specification: str) -> Objective:
     if not callable(function):
         raise TypeError(f"{specification} is not callable")
 
-    def checked(x1: float, x2: float) -> float:
-        value = float(function(x1, x2))
+    def checked(*point: float) -> float:
+        value = float(function(*point))
         if not np.isfinite(value):
             raise ValueError(f"objective returned a non-finite value: {value}")
         return value

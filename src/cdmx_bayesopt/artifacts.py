@@ -24,11 +24,12 @@ def write_history(
     best_so_far = np.minimum.accumulate(values)
     with (directory / "history.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["iteration", "phase", "x1", "x2", "objective", "best_so_far"])
+        variables = [f"x{index}" for index in range(1, points.shape[1] + 1)]
+        writer.writerow(["iteration", "phase", *variables, "objective", "best_so_far"])
         for index, (point, value, best, phase) in enumerate(
             zip(points, values, best_so_far, phases), start=1
         ):
-            writer.writerow([index, phase, point[0], point[1], value, best])
+            writer.writerow([index, phase, *point, value, best])
 
 
 def write_state(directory: Path, points: np.ndarray, values: np.ndarray) -> None:
@@ -95,20 +96,6 @@ def render_frame(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    lower, upper = bounds
-    axis = np.linspace(lower, upper, 72)
-    xx, yy = np.meshgrid(axis, axis)
-    grid = np.column_stack((xx.ravel(), yy.ravel()))
-    if synthetic:
-        surface = synthetic_surface(grid)
-        surface_title = "True synthetic surface"
-    elif model is not None:
-        surface, _ = model.posterior(grid)
-        surface_title = "Gaussian-process prediction"
-    else:
-        surface = np.zeros(len(grid))
-        surface_title = "Initial measurements"
-
     figure, (surface_axis, progress_axis) = plt.subplots(1, 2, figsize=(10, 4.8), dpi=110)
     figure.patch.set_facecolor("#0b1020")
     for plot_axis in (surface_axis, progress_axis):
@@ -117,16 +104,60 @@ def render_frame(
         for spine in plot_axis.spines.values():
             spine.set_color("#475569")
 
-    contour = surface_axis.contourf(xx, yy, surface.reshape(xx.shape), levels=24, cmap="viridis")
-    surface_axis.scatter(points[:, 0], points[:, 1], c="white", edgecolors="#111827", s=42)
-    surface_axis.scatter(points[-1, 0], points[-1, 1], marker="*", c="#fb7185", s=170, edgecolors="white")
-    best = int(np.argmin(values))
-    surface_axis.scatter(points[best, 0], points[best, 1], marker="x", c="#facc15", s=100, linewidths=3)
-    surface_axis.set_title(surface_title, color="white")
-    surface_axis.set_xlabel("x₁", color="white")
-    surface_axis.set_ylabel("x₂", color="white")
-    colorbar = figure.colorbar(contour, ax=surface_axis, shrink=0.82)
-    colorbar.ax.tick_params(colors="#cbd5e1")
+    if points.shape[1] == 2:
+        lower, upper = bounds
+        axis = np.linspace(lower, upper, 72)
+        xx, yy = np.meshgrid(axis, axis)
+        grid = np.column_stack((xx.ravel(), yy.ravel()))
+        if synthetic:
+            surface = synthetic_surface(grid)
+            surface_title = "True synthetic surface"
+        elif model is not None:
+            surface, _ = model.posterior(grid)
+            surface_title = "Gaussian-process prediction"
+        else:
+            surface = np.zeros(len(grid))
+            surface_title = "Initial measurements"
+        contour = surface_axis.contourf(
+            xx, yy, surface.reshape(xx.shape), levels=24, cmap="viridis"
+        )
+        surface_axis.scatter(
+            points[:, 0], points[:, 1], c="white", edgecolors="#111827", s=42
+        )
+        surface_axis.scatter(
+            points[-1, 0],
+            points[-1, 1],
+            marker="*",
+            c="#fb7185",
+            s=170,
+            edgecolors="white",
+        )
+        best = int(np.argmin(values))
+        surface_axis.scatter(points[best, 0], points[best, 1], marker="x", c="#facc15", s=100, linewidths=3)
+        surface_axis.set_title(surface_title, color="white")
+        surface_axis.set_xlabel("x₁", color="white")
+        surface_axis.set_ylabel("x₂", color="white")
+        colorbar = figure.colorbar(contour, ax=surface_axis, shrink=0.82)
+        colorbar.ax.tick_params(colors="#cbd5e1")
+    else:
+        palette = ("#ff6577", "#55e6a5", "#5ba9ff", "#facc15", "#c084fc")
+        names = ("LED red", "LED green", "LED blue") if points.shape[1] == 3 else ()
+        steps = np.arange(1, len(points) + 1)
+        for index in range(points.shape[1]):
+            label = names[index] if names else f"x{index + 1}"
+            surface_axis.plot(
+                steps,
+                points[:, index],
+                marker="o",
+                markersize=3,
+                color=palette[index % len(palette)],
+                label=label,
+            )
+        surface_axis.set_title("Parameters tested", color="white")
+        surface_axis.set_xlabel("Experiment", color="white")
+        surface_axis.set_ylabel("Value", color="white")
+        surface_axis.grid(alpha=0.2)
+        surface_axis.legend(frameon=False, labelcolor="white")
 
     progress_axis.plot(np.arange(1, len(values) + 1), np.minimum.accumulate(values), color="#facc15", marker="o", markersize=3)
     progress_axis.set_title("Best objective found", color="white")

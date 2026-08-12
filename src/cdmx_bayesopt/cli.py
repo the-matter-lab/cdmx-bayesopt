@@ -24,8 +24,9 @@ from .runner import OptimizationConfig, run_optimization
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
-        description="Run lightweight two-dimensional Bayesian optimization."
+        description="Run lightweight Bayesian optimization."
     )
+    result.add_argument("--dimensions", type=int, default=2)
     result.add_argument("--iterations", type=int, default=25)
     result.add_argument("--initial", type=int, default=5)
     result.add_argument("--seed", type=int, default=2026)
@@ -60,6 +61,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.pause < 0:
         print("--pause cannot be negative", file=sys.stderr)
         return 64
+    if args.objective == "synthetic" and args.dimensions != 2:
+        print("the synthetic objective requires --dimensions 2", file=sys.stderr)
+        return 64
     args.output.mkdir(parents=True, exist_ok=True)
     write_dashboard(args.output)
 
@@ -83,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
         candidate_count=args.candidates,
         length_scale=args.length_scale,
         exploration=args.exploration,
+        dimensions=args.dimensions,
     )
     phases: list[str] = []
 
@@ -102,9 +107,10 @@ def main(argv: list[str] | None = None) -> int:
                 args.objective == "synthetic",
             )
         best = int(values.argmin())
+        point = ",".join(f"{value:.4f}" for value in points[-1])
         print(
-            f"step={step:02d} x=({points[-1,0]:.4f},{points[-1,1]:.4f}) "
-            f"value={values[-1]:.6f} best={values[best]:.6f}",
+            f"step={step:02d} x=({point}) value={values[-1]:.6f} "
+            f"best={values[best]:.6f}",
             flush=True,
         )
         if args.pause:
@@ -115,14 +121,14 @@ def main(argv: list[str] | None = None) -> int:
         write_summary(args.output, result, args.seed)
         if args.gif and not args.no_plot:
             create_gif(args.output)
-    except (ImportError, ValueError, OSError) as exc:
+    except (ImportError, TypeError, ValueError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         if server:
             server.shutdown()
         return 2
 
     print(
-        f"best=({result.best_point[0]:.5f},{result.best_point[1]:.5f}) "
+        f"best=({','.join(f'{value:.5f}' for value in result.best_point)}) "
         f"objective={result.best_value:.7f} output={args.output}",
         flush=True,
     )

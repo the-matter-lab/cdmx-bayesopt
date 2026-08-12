@@ -24,6 +24,7 @@ class OptimizationConfig:
     candidate_count: int = 1400
     length_scale: float = 0.72
     exploration: float = 0.01
+    dimensions: int = 2
 
     def validate(self) -> None:
         if self.initial_points < 2:
@@ -34,6 +35,8 @@ class OptimizationConfig:
             raise ValueError("lower_bound must be below upper_bound")
         if self.candidate_count < 100:
             raise ValueError("candidate_count must be at least 100")
+        if self.dimensions < 1:
+            raise ValueError("dimensions must be at least 1")
 
 
 @dataclass(frozen=True)
@@ -56,6 +59,12 @@ class OptimizationResult:
 
 
 def _candidate_pool(config: OptimizationConfig, rng: np.random.Generator) -> np.ndarray:
+    if config.dimensions != 2:
+        return rng.uniform(
+            config.lower_bound,
+            config.upper_bound,
+            size=(config.candidate_count, config.dimensions),
+        )
     grid_side = max(8, int(np.sqrt(config.candidate_count // 2)))
     axis = np.linspace(config.lower_bound, config.upper_bound, grid_side)
     xx, yy = np.meshgrid(axis, axis)
@@ -64,7 +73,7 @@ def _candidate_pool(config: OptimizationConfig, rng: np.random.Generator) -> np.
     random_points = rng.uniform(
         config.lower_bound,
         config.upper_bound,
-        size=(random_count, 2),
+        size=(random_count, config.dimensions),
     )
     return np.vstack((grid, random_points))
 
@@ -81,7 +90,7 @@ def run_optimization(
     points = rng.uniform(
         config.lower_bound,
         config.upper_bound,
-        size=(config.initial_points, 2),
+        size=(config.initial_points, config.dimensions),
     )
     values = np.array([objective(*point) for point in points], dtype=float)
     if not np.all(np.isfinite(values)):

@@ -41,8 +41,8 @@ class GaussianProcess:
     def fit(self, points: np.ndarray, values: np.ndarray) -> "GaussianProcess":
         points = np.asarray(points, dtype=float)
         values = np.asarray(values, dtype=float)
-        if points.ndim != 2 or points.shape[1] != 2:
-            raise ValueError("points must have shape (n, 2)")
+        if points.ndim != 2 or points.shape[1] < 1:
+            raise ValueError("points must have shape (n, dimensions)")
         if values.shape != (len(points),):
             raise ValueError("values must have shape (n,)")
         if len(points) < 2:
@@ -74,6 +74,8 @@ class GaussianProcess:
 
     def posterior(self, candidates: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         candidates = np.asarray(candidates, dtype=float)
+        if candidates.ndim != 2 or candidates.shape[1] != self.points_.shape[1]:
+            raise ValueError("candidates must use the fitted point dimensions")
         cross = self._kernel(self.points_, candidates)
         normalized_mean = cross.T @ self.alpha_
         solved = np.linalg.solve(self.cholesky_, cross)

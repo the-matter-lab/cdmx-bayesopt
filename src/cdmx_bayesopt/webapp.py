@@ -14,20 +14,18 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from urllib.parse import urlsplit
 
+from .colors import color_hex, parse_rgb_color
 from .hardware import HardwareBundle, RGB, build_hardware, validate_brightness, validate_rgb
 
 
 def parse_hex_color(value: str) -> RGB:
-    if not isinstance(value, str) or len(value) != 7 or not value.startswith("#"):
+    """Compatibility helper for callers that require exactly ``#RRGGBB``."""
+    if not isinstance(value, str) or len(value.strip()) != 7 or not value.strip().startswith("#"):
         raise ValueError("color must use #RRGGBB format")
     try:
-        return tuple(int(value[index : index + 2], 16) for index in (1, 3, 5))  # type: ignore[return-value]
+        return parse_rgb_color(value)
     except ValueError as exc:
         raise ValueError("color must use #RRGGBB format") from exc
-
-
-def color_hex(color: RGB) -> str:
-    return "#{:02X}{:02X}{:02X}".format(*color)
 
 
 class ColorLab:

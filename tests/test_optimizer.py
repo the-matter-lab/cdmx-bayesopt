@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import tempfile
 import unittest
@@ -49,6 +50,13 @@ class GaussianProcessTests(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(result)))
         self.assertGreater(result[0], result[1])
 
+    def test_gaussian_process_accepts_three_dimensions(self):
+        points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0], [2.0, 1.0, 0.0]])
+        values = np.array([1.0, 0.0, 2.0])
+        mean, deviation = GaussianProcess().fit(points, values).posterior(points)
+        self.assertEqual(mean.shape, (3,))
+        self.assertEqual(deviation.shape, (3,))
+
 
 class RunnerTests(unittest.TestCase):
     def test_campaign_is_deterministic_and_bounded(self):
@@ -67,6 +75,23 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue(np.all(first.points <= config.upper_bound))
         self.assertLessEqual(first.best_value, first.values[: config.initial_points].min())
 
+    def test_campaign_can_optimize_three_variables(self):
+        objective = lambda red, green, blue: (
+            (red - 20) ** 2 + (green - 40) ** 2 + (blue - 60) ** 2
+        )
+        result = run_optimization(
+            objective,
+            OptimizationConfig(
+                dimensions=3,
+                total_iterations=9,
+                initial_points=4,
+                lower_bound=0,
+                upper_bound=255,
+                candidate_count=300,
+            ),
+        )
+        self.assertEqual(result.points.shape, (9, 3))
+
     def test_writes_machine_readable_artifacts(self):
         result = run_optimization(
             synthetic_point,
@@ -77,8 +102,29 @@ class RunnerTests(unittest.TestCase):
             write_history(directory, result.points, result.values, result.phases)
             write_summary(directory, result, seed=2026)
             self.assertTrue((directory / "history.csv").is_file())
+            with (directory / "history.csv").open(newline="") as handle:
+                self.assertEqual(next(csv.reader(handle))[2:4], ["x1", "x2"])
             summary = json.loads((directory / "summary.json").read_text())
             self.assertEqual(summary["iterations"], 7)
+
+    def test_three_dimensional_history_has_three_variables(self):
+        points = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            write_history(directory, points, np.array([2.0, 1.0]), ["initial"] * 2)
+            with (directory / "history.csv").open(newline="") as handle:
+                self.assertEqual(
+                    next(csv.reader(handle)),
+                    [
+                        "iteration",
+                        "phase",
+                        "x1",
+                        "x2",
+                        "x3",
+                        "objective",
+                        "best_so_far",
+                    ],
+                )
 
 
 if __name__ == "__main__":
