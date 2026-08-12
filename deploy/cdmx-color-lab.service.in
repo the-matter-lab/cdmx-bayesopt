@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 User=@@USER@@
 Group=@@GROUP@@
-SupplementaryGroups=i2c spi
+SupplementaryGroups=i2c spi spidev
 WorkingDirectory=@@ROOT@@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
