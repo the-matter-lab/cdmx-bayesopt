@@ -11,10 +11,78 @@ import random
 import threading
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 
 RGB = tuple[int, int, int]
+I2CBus = int | str
+
+
+def resolve_i2c_bus(
+    bus: I2CBus = "auto", sysfs_root: str | Path = "/sys/class/i2c-dev"
+) -> int:
+    """Resolve a numeric bus or the workshop's GPIO-backed I2C adapter.
+
+    Device-tree-created ``i2c-gpio`` adapters are assigned a bus number at
+    boot, so that number is not a stable interface.  The custom ZERO 3W
+    overlay gives the adapter a stable kernel name instead.  Bus 4 remains a
+    compatibility fallback for cards using the original I2C4-M0 wiring.
+    """
+
+    if isinstance(bus, bool):
+        raise ValueError("I2C bus must be a non-negative number or 'auto'")
+    if isinstance(bus, int):
+        if bus < 0:
+            raise ValueError("I2C bus must be non-negative")
+        return bus
+
+    value = str(bus).strip().lower()
+    if value != "auto":
+        try:
+            result = int(value, 10)
+        except ValueError as exc:
+            raise ValueError(
+                "I2C bus must be a non-negative number or 'auto'"
+            ) from exc
+        if result < 0:
+            raise ValueError("I2C bus must be non-negative")
+        return result
+
+    root = Path(sysfs_root)
+    named: list[tuple[int, str]] = []
+    for adapter in root.glob("i2c-*"):
+        try:
+            number = int(adapter.name.removeprefix("i2c-"))
+            name = (adapter / "name").read_text(encoding="utf-8").strip()
+        except (OSError, ValueError):
+            continue
+        named.append((number, name))
+
+    exact = sorted(
+        number
+        for number, name in named
+        if name == "i2c-gpio-cdmx" or name.endswith(".i2c-gpio-cdmx")
+    )
+    if exact:
+        return exact[0]
+
+    gpio_adapters = sorted(number for number, name in named if "i2c-gpio" in name)
+    if len(gpio_adapters) == 1:
+        return gpio_adapters[0]
+
+    if any(number == 4 for number, _name in named):
+        return 4
+
+    if gpio_adapters:
+        buses = ", ".join(str(number) for number in gpio_adapters)
+        raise OSError(
+            f"multiple i2c-gpio adapters found ({buses}); select one with --i2c-bus"
+        )
+    raise OSError(
+        "CDMX software-I2C adapter was not found; install the ZERO 3W overlay "
+        "and reboot"
+    )
 
 
 def validate_rgb(color: tuple[int, ...] | list[int]) -> RGB:
@@ -330,7 +398,7 @@ class HardwareBundle:
 def build_hardware(
     *,
     simulate: bool,
-    i2c_bus: int = 4,
+    i2c_bus: I2CBus = "auto",
     i2c_address: int = 0x29,
     spi_bus: int = 3,
     spi_device: int = 0,
@@ -347,8 +415,11 @@ def build_hardware(
 
     warnings: list[str] = []
     try:
-        sensor: ColorSensor = TCS34725(i2c_bus, i2c_address)
-        sensor_backend = f"TCS34725 /dev/i2c-{i2c_bus} @ 0x{i2c_address:02x}"
+        resolved_i2c_bus = resolve_i2c_bus(i2c_bus)
+        sensor: ColorSensor = TCS34725(resolved_i2c_bus, i2c_address)
+        sensor_backend = (
+            f"TCS34725 /dev/i2c-{resolved_i2c_bus} @ 0x{i2c_address:02x}"
+        )
     except (ImportError, OSError, ValueError) as exc:
         message = f"Color sensor unavailable: {exc}"
         sensor = UnavailableSensor(message)

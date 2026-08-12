@@ -11,7 +11,7 @@ SupplementaryGroups=i2c spi
 WorkingDirectory=@@ROOT@@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=@@ROOT@@/.venv/bin/cdmx-color-lab --host 0.0.0.0 --port 8010 --i2c-bus 4 --spi-bus 3 --spi-device 0
+ExecStart=@@ROOT@@/.venv/bin/cdmx-color-lab --host 0.0.0.0 --port 8010 --i2c-bus auto --spi-bus 3 --spi-device 0
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

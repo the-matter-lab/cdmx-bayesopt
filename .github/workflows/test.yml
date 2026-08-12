@@ -21,4 +21,13 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install --editable .
+      - run: sudo apt-get update && sudo apt-get install --yes device-tree-compiler
+      - run: >-
+          dtc -q -@ -I dts -O dtb
+          -o /tmp/cdmx-zero3w-i2c-gpio.dtbo
+          deploy/cdmx-zero3w-i2c-gpio.dts
+      - run: >-
+          echo
+          'd8631d0f0ac2b9aa0c3ac70285d421018ce274ac6fd6fe95a9aa7ee39b17edd0  deploy/kernel/i2c-gpio/i2c-gpio.c'
+          | sha256sum --check --strict
       - run: make test

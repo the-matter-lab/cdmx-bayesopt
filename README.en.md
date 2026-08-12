@@ -64,37 +64,54 @@ Open it at `http://equipoN.local:8010/`.
 
 | Device | Signal | Physical Radxa pin | Function |
 |---|---|---:|---|
-| Gravity TCS34725 | VCC | 1 | 3.3 V |
+| Gravity TCS34725 | VCC | **4** | 5 V |
 | Gravity TCS34725 | GND | 6 | Ground |
-| Gravity TCS34725 | SDA | 27 | `I2C4_SDA_M0` |
-| Gravity TCS34725 | SCL | 28 | `I2C4_SCL_M0` |
-| NeoPixel | VCC | 2 or 4 | 5 V |
-| NeoPixel | GND | 6 | Common ground |
+| Gravity TCS34725 | SCL | **8** | `GPIO0_D1`, software I2C clock |
+| Gravity TCS34725 | SDA | **10** | `GPIO0_D0`, software I2C data |
+| NeoPixel | VCC | **2** | 5 V |
 | NeoPixel | DIN | **19** | `SPI3_MOSI_M1` |
+| NeoPixel | GND | **20** | Ground |
 
-**Move the NeoPixel DIN wire from physical pin 3 to pin 19.** Radxa documents
-that pin 3 has an additional I²C pull-up and may behave abnormally as GPIO. A
-WS2812 also requires 800 kHz timing that Python/Linux GPIO cannot generate
-reliably. The included production backend encodes GRB with the hardware SPI
-peripheral, so it uses MOSI on pin 19. A 74AHCT125 or 74HCT245 logic-level
-shifter between the 3.3 V output and DIN is recommended, especially when the
-NeoPixel is powered from 5 V.
+With the board powered off, place the sensor's four-socket connector straight
+down the even-numbered header column: **4 VCC, 6 GND, 8 SCL, 10 SDA**. This is
+the connector order printed on the Gravity SEN0212 board; do not swap SCL and
+SDA. Its onboard regulator accepts 5 V while the I2C signals remain at the
+ZERO 3W's 3.3 V logic level.
 
-Before installation, run `sudo rsetup`, enable the `I2C4-M0` and `SPI3-M1`
-overlays, and reboot. Then confirm the hardware device files:
+The workshop image configures pins 8/10 while the SD card image is built. On a
+plain RadxaOS installation, `install-color-lab.sh` installs the same overlay.
+It disables the FIQ/UART2 debug console on those two pins and creates a
+kernel-backed software-I2C adapter, so pins 8/10 can no longer be used as the
+serial debug console. The app finds the adapter by name because its `/dev/i2c-N`
+number can vary between boots. The pinned workshop RadxaOS kernel omits the
+`i2c-gpio` driver, so the installer also builds the upstream Linux v6.1.84
+driver against the exact matching kernel headers and rejects an ABI mismatch.
 
-```bash
-ls -l /dev/i2c-4 /dev/spidev3.0
-sudo i2cdetect -y 4
-# address 29 should appear
-```
+The WS2812 timing still comes from hardware SPI: DIN is pin 19, ground is pin
+20, and its separate 5 V feed is pin 2. A 74AHCT125 or 74HCT245 logic-level
+shifter between the 3.3 V MOSI output and DIN is recommended, especially when
+the NeoPixel is powered from 5 V.
 
-Install the app and its automatic boot service from each team's clone:
+Install the app and its automatic boot service from each team's clone. Reboot
+once after installing on plain RadxaOS; workshop cards already contain the boot
+overlay when flashed:
 
 ```bash
 git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
 cd cdmx-bayesopt
 ./scripts/install-color-lab.sh
+grep -qhs 'i2c-gpio-cdmx' /sys/class/i2c-dev/i2c-*/name || sudo reboot
+```
+
+After reboot, find the line named `i2c-gpio-cdmx`, use its number in
+`i2cdetect`, and confirm that address `29` appears:
+
+```bash
+i2c_name=$(grep -l 'i2c-gpio-cdmx' /sys/class/i2c-dev/i2c-*/name)
+i2c_bus=${i2c_name%/name}
+printf 'Sensor adapter: %s\n' "${i2c_bus##*/}"
+ls -l /dev/spidev3.0
+sudo i2cdetect -y "${i2c_bus##*-}"
 ```
 
 The service keeps five minutes of readings in memory, does not write samples to
@@ -200,6 +217,7 @@ dependencies. See [`NOTICE.md`](NOTICE.md) for attribution and
 [`LICENSE`](LICENSE) for this repository's license.
 
 Hardware references: [official Radxa ZERO 3W pinout](https://docs.radxa.com/zero/zero3/hardware-design/hardware-interface),
+[Radxa's pins 8/10 and overlay documentation](https://docs.radxa.com/en/zero/zero3/radxa-os/rsetup#configure-pins-8-and-10-as-gpios),
 [DFRobot Gravity TCS34725](https://wiki.dfrobot.com/sen0212/),
 [TCS34725 and WS2812B sensors on Radxa](https://docs.radxa.com/en/rock3/rock3a/app-development/sensor),
 and [Adafruit NeoPixel electrical best practices](https://learn.adafruit.com/adafruit-neopixel-uberguide/best-practices).

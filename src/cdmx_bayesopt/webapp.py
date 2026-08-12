@@ -226,7 +226,11 @@ def parser() -> argparse.ArgumentParser:
     )
     result.add_argument("--host", default="0.0.0.0")
     result.add_argument("--port", type=int, default=8010)
-    result.add_argument("--i2c-bus", type=int, default=4)
+    result.add_argument(
+        "--i2c-bus",
+        default="auto",
+        help="I2C adapter number, or auto for the CDMX pins 8/10 adapter",
+    )
     result.add_argument("--i2c-address", type=lambda value: int(value, 0), default=0x29)
     result.add_argument("--spi-bus", type=int, default=3)
     result.add_argument("--spi-device", type=int, default=0)

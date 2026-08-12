@@ -64,38 +64,55 @@ brillo. Se abre en `http://equipoN.local:8010/`.
 
 | Dispositivo | Señal | Pin físico de la Radxa | Función |
 |---|---|---:|---|
-| Gravity TCS34725 | VCC | 1 | 3.3 V |
+| Gravity TCS34725 | VCC | **4** | 5 V |
 | Gravity TCS34725 | GND | 6 | Tierra |
-| Gravity TCS34725 | SDA | 27 | `I2C4_SDA_M0` |
-| Gravity TCS34725 | SCL | 28 | `I2C4_SCL_M0` |
-| NeoPixel | VCC | 2 o 4 | 5 V |
-| NeoPixel | GND | 6 | Tierra común |
+| Gravity TCS34725 | SCL | **8** | `GPIO0_D1`, reloj I2C por software |
+| Gravity TCS34725 | SDA | **10** | `GPIO0_D0`, datos I2C por software |
+| NeoPixel | VCC | **2** | 5 V |
 | NeoPixel | DIN | **19** | `SPI3_MOSI_M1` |
+| NeoPixel | GND | **20** | Tierra |
 
-**Mueva el cable DIN del NeoPixel del pin físico 3 al pin 19.** Radxa indica
-que el pin 3 tiene una resistencia pull-up adicional para I²C y puede funcionar
-de manera anormal como GPIO. Además, un WS2812 necesita temporización de
-800 kHz que no es confiable con GPIO desde Python/Linux. El backend incluido
-codifica GRB mediante el periférico SPI de hardware, por eso usa MOSI en el pin
-19. Es recomendable colocar un conversor lógico 74AHCT125 o 74HCT245 entre la
-salida de 3.3 V y DIN, especialmente si el NeoPixel se alimenta con 5 V.
+Con la placa apagada, coloque el conector de cuatro contactos del sensor en
+línea recta sobre la columna de pines pares: **4 VCC, 6 GND, 8 SCL, 10 SDA**.
+Este es el orden impreso en la placa Gravity SEN0212; no intercambie SCL y SDA.
+Su regulador integrado acepta 5 V y las señales I2C permanecen al nivel lógico
+de 3.3 V de la ZERO 3W.
 
-Antes de instalar, ejecute `sudo rsetup`, active los overlays `I2C4-M0` y
-`SPI3-M1`, y reinicie. Después confirme que existen los dispositivos:
+La imagen del taller configura los pines 8/10 durante la creación de la tarjeta
+SD. En una instalación normal de RadxaOS, `install-color-lab.sh` instala el
+mismo overlay. Este desactiva la consola de depuración FIQ/UART2 de esos dos
+pines y crea un adaptador I2C por software manejado por el kernel; por ello, los
+pines 8/10 dejan de estar disponibles como consola serial. La aplicación busca
+el adaptador por nombre porque su número `/dev/i2c-N` puede variar. El kernel
+fijado de RadxaOS no incluye el controlador `i2c-gpio`, así que el instalador
+también compila el controlador oficial de Linux v6.1.84 con los headers exactos
+y rechaza cualquier incompatibilidad de ABI.
 
-```bash
-ls -l /dev/i2c-4 /dev/spidev3.0
-sudo i2cdetect -y 4
-# debe aparecer 29
-```
+La temporización del WS2812 sigue usando SPI de hardware: DIN va al pin 19,
+tierra al pin 20 y su alimentación separada de 5 V al pin 2. Se recomienda un
+conversor lógico 74AHCT125 o 74HCT245 entre la salida MOSI de 3.3 V y DIN,
+especialmente cuando el NeoPixel se alimenta con 5 V.
 
 Instale la aplicación y su servicio de arranque automático desde el clon hecho
-por cada equipo:
+por cada equipo. Reinicie una vez si está instalando sobre RadxaOS normal; las
+tarjetas del taller ya incluyen el overlay al ser grabadas:
 
 ```bash
 git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
 cd cdmx-bayesopt
 ./scripts/install-color-lab.sh
+grep -qhs 'i2c-gpio-cdmx' /sys/class/i2c-dev/i2c-*/name || sudo reboot
+```
+
+Después del reinicio, busque la línea `i2c-gpio-cdmx`, use su número con
+`i2cdetect` y confirme que aparezca la dirección `29`:
+
+```bash
+i2c_name=$(grep -l 'i2c-gpio-cdmx' /sys/class/i2c-dev/i2c-*/name)
+i2c_bus=${i2c_name%/name}
+printf 'Adaptador del sensor: %s\n' "${i2c_bus##*/}"
+ls -l /dev/spidev3.0
+sudo i2cdetect -y "${i2c_bus##*-}"
 ```
 
 El servicio conserva cinco minutos de lecturas en memoria, no escribe datos en
@@ -203,6 +220,7 @@ incluye sus datos, cuadernos, firmware ni dependencias Ax/PyTorch. Consulte
 licencia de este repositorio.
 
 Referencias de hardware: [pinout oficial de Radxa ZERO 3W](https://docs.radxa.com/zero/zero3/hardware-design/hardware-interface),
+[documentación de Radxa sobre los pines 8/10 y overlays](https://docs.radxa.com/en/zero/zero3/radxa-os/rsetup#configure-pins-8-and-10-as-gpios),
 [Gravity TCS34725 de DFRobot](https://wiki.dfrobot.com/sen0212/),
 [sensores TCS34725 y WS2812B en Radxa](https://docs.radxa.com/en/rock3/rock3a/app-development/sensor)
 y [prácticas eléctricas para NeoPixel de Adafruit](https://learn.adafruit.com/adafruit-neopixel-uberguide/best-practices).
