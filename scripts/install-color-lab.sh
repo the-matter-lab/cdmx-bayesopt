@@ -17,6 +17,7 @@ getent passwd "$SERVICE_USER" >/dev/null || {
 SERVICE_GROUP=$(id -gn "$SERVICE_USER")
 
 "$ROOT/scripts/install-radxa.sh"
+"$ROOT/scripts/install-zero3w-hardware.sh"
 
 "${SUDO[@]}" groupadd --force --system i2c
 "${SUDO[@]}" groupadd --force --system spi
@@ -52,6 +53,7 @@ fi
 hostname=$(hostname)
 printf 'Installed CDMX Color Lab for %s.\n' "$SERVICE_USER"
 printf 'Open: http://%s.local:8010/\n' "$hostname"
-if [[ ! -e /dev/i2c-4 || ! -e /dev/spidev3.0 ]]; then
-  printf '%s\n' 'Hardware device files are missing. Enable I2C4-M0 and SPI3-M1 in sudo rsetup, then reboot.'
+if ! grep -qhs 'i2c-gpio-cdmx' /sys/class/i2c-dev/i2c-*/name || \
+    [[ ! -e /dev/spidev3.0 ]]; then
+  printf '%s\n' 'Hardware interfaces are not active yet. Reboot once, then rerun the checks in the README.'
 fi

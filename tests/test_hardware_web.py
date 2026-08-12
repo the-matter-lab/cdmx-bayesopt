@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import threading
 import time
 import unittest
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 from cdmx_bayesopt.hardware import (
     HardwareBundle,
@@ -14,6 +16,7 @@ from cdmx_bayesopt.hardware import (
     SpiNeoPixel,
     TCS34725,
     encode_ws2812,
+    resolve_i2c_bus,
     validate_brightness,
     validate_rgb,
 )
@@ -55,6 +58,28 @@ class FakeSpi:
 
 
 class HardwareTests(unittest.TestCase):
+    def test_i2c_bus_auto_discovers_named_gpio_adapter(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            for number, name in ((4, "rk3x-i2c"), (11, "i2c-gpio-cdmx")):
+                adapter = root / f"i2c-{number}"
+                adapter.mkdir()
+                (adapter / "name").write_text(name, encoding="utf-8")
+            self.assertEqual(resolve_i2c_bus("auto", root), 11)
+
+    def test_i2c_bus_auto_keeps_legacy_bus_four_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            adapter = root / "i2c-4"
+            adapter.mkdir()
+            (adapter / "name").write_text("rk3x-i2c", encoding="utf-8")
+            self.assertEqual(resolve_i2c_bus("auto", root), 4)
+
+    def test_i2c_bus_validation(self):
+        self.assertEqual(resolve_i2c_bus("12"), 12)
+        with self.assertRaises(ValueError):
+            resolve_i2c_bus("not-a-bus")
+
     def test_validation(self):
         self.assertEqual(validate_rgb([0, 128, 255]), (0, 128, 255))
         self.assertEqual(validate_brightness(0.5), 0.5)

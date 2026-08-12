@@ -1,0 +1,57 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	metadata {
+		title = "CDMX ZERO 3W software I2C on header pins 8 and 10";
+		compatible = "radxa,zero3";
+		category = "misc";
+		exclusive = "GPIO0_D1", "GPIO0_D0", "fiq_debugger", "uart2";
+		description = "Disable FIQ/UART2 and expose i2c-gpio-cdmx with SCL on physical pin 8 and SDA on physical pin 10.";
+	};
+
+	fragment@0 {
+		target = <&fiq_debugger>;
+		__overlay__ {
+			status = "disabled";
+			rockchip,serial-id = <0xffffffff>;
+		};
+	};
+
+	fragment@1 {
+		target = <&uart2>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@2 {
+		target = <&pinctrl>;
+		__overlay__ {
+			cdmx_i2c_gpio_pins: cdmx-i2c-gpio-pins {
+				/* bank 0, RK_PD1/RK_PD0 (25/24), GPIO function */
+				rockchip,pins =
+					<0 25 0 &pcfg_pull_up>,
+					<0 24 0 &pcfg_pull_up>;
+			};
+		};
+	};
+
+	fragment@3 {
+		target-path = "/";
+		__overlay__ {
+			i2c_gpio_cdmx: i2c-gpio-cdmx {
+				compatible = "i2c-gpio";
+				/* flags 6 = GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN */
+				sda-gpios = <&gpio0 24 6>;
+				scl-gpios = <&gpio0 25 6>;
+				i2c-gpio,delay-us = <5>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&cdmx_i2c_gpio_pins>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				status = "okay";
+			};
+		};
+	};
+};
