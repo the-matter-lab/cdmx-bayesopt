@@ -85,6 +85,13 @@ class ColorLab:
         with self._lock:
             self._pixel_error = None
 
+    def clear_history(self) -> int:
+        """Discard all stored sensor samples and return the number removed."""
+        with self._lock:
+            count = len(self._history)
+            self._history.clear()
+        return count
+
     def snapshot(self) -> dict[str, object]:
         with self._lock:
             history = list(self._history)
@@ -181,7 +188,14 @@ class ColorLabHandler(BaseHTTPRequestHandler):
         self._error(HTTPStatus.NOT_FOUND, "not found")
 
     def do_POST(self) -> None:
-        if urlsplit(self.path).path != "/api/led":
+        path = urlsplit(self.path).path
+        if path == "/api/history/clear":
+            self._send_json(
+                HTTPStatus.OK,
+                {"ok": True, "cleared": self.server.app.clear_history()},
+            )
+            return
+        if path != "/api/led":
             self._error(HTTPStatus.NOT_FOUND, "not found")
             return
         try:

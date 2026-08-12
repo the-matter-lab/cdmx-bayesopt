@@ -260,6 +260,8 @@ class WebTests(unittest.TestCase):
         self.assertIn(b"CDMX Color Lab", html)
         self.assertIn(b"8-bit sensor color", html)
         self.assertIn(b"target-value", html)
+        self.assertIn(b"graph-max", html)
+        self.assertIn(b"clear-history", html)
         self.assertIn("nosniff", headers["X-Content-Type-Options"])
         status, payload, _ = self.request(
             "/api/led", {"color": "#0102FE", "brightness": 0.75}
@@ -273,6 +275,14 @@ class WebTests(unittest.TestCase):
         self.assertTrue(state["sensor"]["ok"])
         self.assertTrue(state["pixel"]["ok"])
         self.assertGreaterEqual(len(state["readings"]), 1)
+
+    def test_clear_history_endpoint(self):
+        time.sleep(0.13)
+        status, payload, _ = self.request("/api/history/clear", {})
+        result = json.loads(payload)
+        self.assertEqual(status, 200)
+        self.assertTrue(result["ok"])
+        self.assertGreaterEqual(result["cleared"], 1)
 
     def test_rejects_invalid_color(self):
         with self.assertRaises(urllib.error.HTTPError) as caught:
