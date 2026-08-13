@@ -21,17 +21,8 @@ if command -v curl >/dev/null 2>&1 && \
   exit 69
 fi
 
-export CDMX_TARGET_RGB=$1
-shift
-
 printf 'BayesOpt controls I2C/SPI directly; it does not start Color Lab.\n'
 printf 'Campaign: http://%s.local:8000/ (Ctrl-C stops it)\n' "$(hostname)"
 exec "$BAYESOPT" \
-  --objective "$ROOT/examples/hardware_objective.py:measure" \
-  --dimensions 3 \
-  --lower 0 --upper 255 \
-  --length-scale 45 \
-  --iterations 18 --initial 6 --candidates 1200 \
-  --pause 0.2 --gif --serve --port 8000 \
-  --output "$ROOT/runs/color-campaign" \
-  "$@"
+  "$1" --gif --serve --port 8000 --output "$ROOT/runs/color-campaign" \
+  "${@:2}"

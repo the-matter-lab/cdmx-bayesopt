@@ -10,121 +10,87 @@ import numpy as np
 
 from cdmx_bayesopt.artifacts import write_history, write_summary
 from cdmx_bayesopt.gp import GaussianProcess, expected_improvement
-from cdmx_bayesopt.objectives import load_objective, synthetic_point, synthetic_surface
 from cdmx_bayesopt.runner import OptimizationConfig, run_optimization
 
 
-class ObjectiveTests(unittest.TestCase):
-    def test_surface_vectorizes(self):
-        points = np.array([[0.0, 0.0], [1.0, -1.0]])
-        values = synthetic_surface(points)
-        self.assertEqual(values.shape, (2,))
-        self.assertAlmostEqual(values[0], synthetic_point(0.0, 0.0))
-
-    def test_loader(self):
-        self.assertIs(load_objective("synthetic"), synthetic_point)
-        with self.assertRaises(ValueError):
-            load_objective("missing-colon")
-
-    def test_loader_accepts_a_python_file(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            objective_file = Path(temporary) / "experiment.py"
-            objective_file.write_text("def measure(x1, x2):\n    return x1 + x2\n")
-            objective = load_objective(f"{objective_file}:measure")
-            self.assertEqual(objective(1.25, 2.5), 3.75)
+def color_score(red: float, green: float, blue: float) -> float:
+    target = np.array([40.0, 120.0, 210.0])
+    rgb = np.array([red, green, blue])
+    return float(1.0 - np.mean(((rgb - target) / 255.0) ** 2))
 
 
 class GaussianProcessTests(unittest.TestCase):
-    def test_posterior_is_close_to_observations(self):
-        points = np.array([[-1.0, -1.0], [0.0, 0.0], [1.0, 1.0]])
-        values = np.array([1.0, 0.0, 1.5])
-        model = GaussianProcess(noise=1e-9).fit(points, values)
+    def test_posterior_is_close_to_rgb_observations(self):
+        points = np.array(
+            [[0.0, 0.0, 0.0], [64.0, 128.0, 192.0], [255.0, 255.0, 255.0]]
+        )
+        scores = np.array([0.2, 0.95, 0.4])
+        model = GaussianProcess(length_scale=45, noise=1e-9).fit(points, scores)
         mean, deviation = model.posterior(points)
-        np.testing.assert_allclose(mean, values, atol=1e-5)
+        np.testing.assert_allclose(mean, scores, atol=1e-5)
         self.assertTrue(np.all(deviation < 1e-3))
 
-    def test_expected_improvement_is_finite(self):
+    def test_expected_improvement_prefers_a_higher_score(self):
         result = expected_improvement(
-            np.array([0.0, 1.0]), np.array([0.2, 0.3]), best_value=0.5
+            np.array([0.8, 0.4]), np.array([0.2, 0.2]), best_score=0.6
         )
         self.assertTrue(np.all(np.isfinite(result)))
         self.assertGreater(result[0], result[1])
 
-    def test_gaussian_process_accepts_three_dimensions(self):
-        points = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0], [2.0, 1.0, 0.0]])
-        values = np.array([1.0, 0.0, 2.0])
-        mean, deviation = GaussianProcess().fit(points, values).posterior(points)
-        self.assertEqual(mean.shape, (3,))
-        self.assertEqual(deviation.shape, (3,))
+    def test_gaussian_process_rejects_non_rgb_inputs(self):
+        with self.assertRaisesRegex(ValueError, "red, green, blue"):
+            GaussianProcess().fit(
+                np.array([[0.0, 0.0], [1.0, 1.0]]), np.array([0.1, 0.2])
+            )
 
 
 class RunnerTests(unittest.TestCase):
-    def test_campaign_is_deterministic_and_bounded(self):
+    def test_rgb_campaign_is_deterministic_bounded_and_maximizes(self):
         config = OptimizationConfig(
             total_iterations=12,
             initial_points=4,
             seed=11,
             candidate_count=500,
         )
-        first = run_optimization(synthetic_point, config)
-        second = run_optimization(synthetic_point, config)
+        first = run_optimization(color_score, config)
+        second = run_optimization(color_score, config)
         np.testing.assert_allclose(first.points, second.points)
-        np.testing.assert_allclose(first.values, second.values)
-        self.assertEqual(len(first.values), 12)
-        self.assertTrue(np.all(first.points >= config.lower_bound))
-        self.assertTrue(np.all(first.points <= config.upper_bound))
-        self.assertLessEqual(first.best_value, first.values[: config.initial_points].min())
-
-    def test_campaign_can_optimize_three_variables(self):
-        objective = lambda red, green, blue: (
-            (red - 20) ** 2 + (green - 40) ** 2 + (blue - 60) ** 2
+        np.testing.assert_allclose(first.scores, second.scores)
+        self.assertEqual(first.points.shape, (12, 3))
+        self.assertTrue(np.all(first.points >= 0))
+        self.assertTrue(np.all(first.points <= 255))
+        self.assertGreaterEqual(
+            first.best_score, first.scores[: config.initial_points].max()
         )
+
+    def test_writes_rgb_sensor_artifacts(self):
         result = run_optimization(
-            objective,
+            color_score,
             OptimizationConfig(
-                dimensions=3,
-                total_iterations=9,
-                initial_points=4,
-                lower_bound=0,
-                upper_bound=255,
-                candidate_count=300,
+                total_iterations=7, initial_points=4, candidate_count=300
             ),
         )
-        self.assertEqual(result.points.shape, (9, 3))
-
-    def test_writes_machine_readable_artifacts(self):
-        result = run_optimization(
-            synthetic_point,
-            OptimizationConfig(total_iterations=7, initial_points=4, candidate_count=300),
-        )
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            write_history(directory, result.points, result.values, result.phases)
+            write_history(directory, result.points, result.scores, result.phases)
             write_summary(directory, result, seed=2026)
-            self.assertTrue((directory / "history.csv").is_file())
-            with (directory / "history.csv").open(newline="") as handle:
-                self.assertEqual(next(csv.reader(handle))[2:4], ["x1", "x2"])
-            summary = json.loads((directory / "summary.json").read_text())
-            self.assertEqual(summary["iterations"], 7)
-
-    def test_three_dimensional_history_has_three_variables(self):
-        points = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-        with tempfile.TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            write_history(directory, points, np.array([2.0, 1.0]), ["initial"] * 2)
             with (directory / "history.csv").open(newline="") as handle:
                 self.assertEqual(
                     next(csv.reader(handle)),
                     [
                         "iteration",
                         "phase",
-                        "x1",
-                        "x2",
-                        "x3",
-                        "objective",
+                        "red",
+                        "green",
+                        "blue",
+                        "sensor_score",
                         "best_so_far",
                     ],
                 )
+            summary = json.loads((directory / "summary.json").read_text())
+            self.assertEqual(summary["iterations"], 7)
+            self.assertIn("best_rgb", summary)
+            self.assertIn("best_score", summary)
 
 
 if __name__ == "__main__":

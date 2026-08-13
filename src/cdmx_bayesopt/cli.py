@@ -18,30 +18,26 @@ from .artifacts import (
     write_state,
     write_summary,
 )
-from .objectives import load_objective
+from .colors import parse_rgb_color
+from .experiment import objective_for
 from .runner import OptimizationConfig, run_optimization
 
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
-        description="Run lightweight Bayesian optimization."
+        description="Optimize three LED RGB values against the reflected-color sensor."
     )
-    result.add_argument("--dimensions", type=int, default=2)
-    result.add_argument("--iterations", type=int, default=25)
-    result.add_argument("--initial", type=int, default=5)
+    result.add_argument("target", help="target reflected color as #RRGGBB or R,G,B")
+    result.add_argument("--iterations", type=int, default=18)
+    result.add_argument("--initial", type=int, default=6)
     result.add_argument("--seed", type=int, default=2026)
-    result.add_argument("--lower", type=float, default=-3.0)
-    result.add_argument("--upper", type=float, default=3.0)
-    result.add_argument("--candidates", type=int, default=1400)
-    result.add_argument("--length-scale", type=float, default=0.72)
+    result.add_argument("--candidates", type=int, default=1200)
+    result.add_argument("--length-scale", type=float, default=45.0)
     result.add_argument("--exploration", type=float, default=0.01)
+    result.add_argument("--output", type=Path, default=Path("runs/color-campaign"))
     result.add_argument(
-        "--objective",
-        default="synthetic",
-        help="synthetic, module:function, or file.py:function",
+        "--pause", type=float, default=0.2, help="seconds between experiments"
     )
-    result.add_argument("--output", type=Path, default=Path("runs/demo"))
-    result.add_argument("--pause", type=float, default=0.0, help="seconds between experiments")
     result.add_argument("--no-plot", action="store_true")
     result.add_argument("--gif", action="store_true")
     result.add_argument("--serve", action="store_true", help="serve the live dashboard")
@@ -50,7 +46,9 @@ def parser() -> argparse.ArgumentParser:
 
 
 def _start_server(directory: Path, port: int) -> http.server.ThreadingHTTPServer:
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(directory))
+    handler = functools.partial(
+        http.server.SimpleHTTPRequestHandler, directory=str(directory)
+    )
     server = http.server.ThreadingHTTPServer(("0.0.0.0", port), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
@@ -61,8 +59,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.pause < 0:
         print("--pause cannot be negative", file=sys.stderr)
         return 64
-    if args.objective == "synthetic" and args.dimensions != 2:
-        print("the synthetic objective requires --dimensions 2", file=sys.stderr)
+    try:
+        target = parse_rgb_color(args.target)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 64
     args.output.mkdir(parents=True, exist_ok=True)
     write_dashboard(args.output)
@@ -71,46 +71,29 @@ def main(argv: list[str] | None = None) -> int:
     if server:
         print(f"dashboard=http://0.0.0.0:{args.port}/", flush=True)
 
-    try:
-        objective = load_objective(args.objective)
-    except (ImportError, AttributeError, TypeError, ValueError, OSError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        if server:
-            server.shutdown()
-        return 2
+    objective = objective_for(target)
     config = OptimizationConfig(
         total_iterations=args.iterations,
         initial_points=args.initial,
         seed=args.seed,
-        lower_bound=args.lower,
-        upper_bound=args.upper,
         candidate_count=args.candidates,
         length_scale=args.length_scale,
         exploration=args.exploration,
-        dimensions=args.dimensions,
     )
     phases: list[str] = []
 
-    def update(step, points, values, model):
-        while len(phases) < len(values):
+    def update(step, points, scores):
+        while len(phases) < len(scores):
             phases.append("initial" if len(phases) < args.initial else "bayesian")
-        write_history(args.output, points, values, phases)
-        write_state(args.output, points, values)
+        write_history(args.output, points, scores, phases)
+        write_state(args.output, points, scores)
         if not args.no_plot:
-            render_frame(
-                args.output,
-                step,
-                points,
-                values,
-                model,
-                (args.lower, args.upper),
-                args.objective == "synthetic",
-            )
-        best = int(values.argmin())
+            render_frame(args.output, step, points, scores)
+        best = int(scores.argmax())
         point = ",".join(f"{value:.4f}" for value in points[-1])
         print(
-            f"step={step:02d} x=({point}) value={values[-1]:.6f} "
-            f"best={values[best]:.6f}",
+            f"step={step:02d} rgb=({point}) score={scores[-1]:.6f} "
+            f"best={scores[best]:.6f}",
             flush=True,
         )
         if args.pause:
@@ -128,8 +111,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print(
-        f"best=({','.join(f'{value:.5f}' for value in result.best_point)}) "
-        f"objective={result.best_value:.7f} output={args.output}",
+        f"best_rgb=({','.join(f'{value:.5f}' for value in result.best_point)}) "
+        f"sensor_score={result.best_score:.7f} output={args.output}",
         flush=True,
     )
     if server:

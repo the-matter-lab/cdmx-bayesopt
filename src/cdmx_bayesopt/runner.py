@@ -1,4 +1,4 @@
-"""Closed-loop Bayesian-optimization runner."""
+"""Closed-loop three-channel RGB Bayesian-optimization runner."""
 
 from __future__ import annotations
 
@@ -8,74 +8,58 @@ from dataclasses import dataclass
 import numpy as np
 
 from .gp import GaussianProcess, propose_next
-from .objectives import Objective
 
+RGB_MIN = 0.0
+RGB_MAX = 255.0
+RGB_CHANNELS = 3
 
-StepCallback = Callable[[int, np.ndarray, np.ndarray, GaussianProcess | None], None]
+Objective = Callable[[float, float, float], float]
+StepCallback = Callable[[int, np.ndarray, np.ndarray], None]
 
 
 @dataclass(frozen=True)
 class OptimizationConfig:
-    total_iterations: int = 25
-    initial_points: int = 5
+    total_iterations: int = 18
+    initial_points: int = 6
     seed: int = 2026
-    lower_bound: float = -3.0
-    upper_bound: float = 3.0
-    candidate_count: int = 1400
-    length_scale: float = 0.72
+    candidate_count: int = 1200
+    length_scale: float = 45.0
     exploration: float = 0.01
-    dimensions: int = 2
 
     def validate(self) -> None:
         if self.initial_points < 2:
             raise ValueError("initial_points must be at least 2")
         if self.total_iterations <= self.initial_points:
             raise ValueError("total_iterations must exceed initial_points")
-        if self.lower_bound >= self.upper_bound:
-            raise ValueError("lower_bound must be below upper_bound")
         if self.candidate_count < 100:
             raise ValueError("candidate_count must be at least 100")
-        if self.dimensions < 1:
-            raise ValueError("dimensions must be at least 1")
 
 
 @dataclass(frozen=True)
 class OptimizationResult:
     points: np.ndarray
-    values: np.ndarray
+    scores: np.ndarray
     phases: tuple[str, ...]
 
     @property
     def best_index(self) -> int:
-        return int(np.argmin(self.values))
+        return int(np.argmax(self.scores))
 
     @property
     def best_point(self) -> np.ndarray:
         return self.points[self.best_index].copy()
 
     @property
-    def best_value(self) -> float:
-        return float(self.values[self.best_index])
+    def best_score(self) -> float:
+        return float(self.scores[self.best_index])
 
 
 def _candidate_pool(config: OptimizationConfig, rng: np.random.Generator) -> np.ndarray:
-    if config.dimensions != 2:
-        return rng.uniform(
-            config.lower_bound,
-            config.upper_bound,
-            size=(config.candidate_count, config.dimensions),
-        )
-    grid_side = max(8, int(np.sqrt(config.candidate_count // 2)))
-    axis = np.linspace(config.lower_bound, config.upper_bound, grid_side)
-    xx, yy = np.meshgrid(axis, axis)
-    grid = np.column_stack((xx.ravel(), yy.ravel()))
-    random_count = max(0, config.candidate_count - len(grid))
-    random_points = rng.uniform(
-        config.lower_bound,
-        config.upper_bound,
-        size=(random_count, config.dimensions),
+    return rng.uniform(
+        RGB_MIN,
+        RGB_MAX,
+        size=(config.candidate_count, RGB_CHANNELS),
     )
-    return np.vstack((grid, random_points))
 
 
 def run_optimization(
@@ -88,39 +72,35 @@ def run_optimization(
     config.validate()
     rng = np.random.default_rng(config.seed)
     points = rng.uniform(
-        config.lower_bound,
-        config.upper_bound,
-        size=(config.initial_points, config.dimensions),
+        RGB_MIN,
+        RGB_MAX,
+        size=(config.initial_points, RGB_CHANNELS),
     )
-    values = np.array([objective(*point) for point in points], dtype=float)
-    if not np.all(np.isfinite(values)):
-        raise ValueError("objective returned non-finite initial values")
+    scores = np.array([objective(*point) for point in points], dtype=float)
+    if not np.all(np.isfinite(scores)):
+        raise ValueError("objective returned non-finite initial scores")
     phases = ["initial"] * config.initial_points
 
     if callback:
-        callback(len(points), points.copy(), values.copy(), None)
+        callback(len(points), points.copy(), scores.copy())
 
     candidates = _candidate_pool(config, rng)
-    model: GaussianProcess | None = None
     while len(points) < config.total_iterations:
-        model = GaussianProcess(length_scale=config.length_scale).fit(points, values)
+        model = GaussianProcess(length_scale=config.length_scale).fit(points, scores)
         next_point = propose_next(
             model,
             points,
-            values,
+            scores,
             candidates,
             config.exploration,
         )
-        next_value = float(objective(*next_point))
-        if not np.isfinite(next_value):
-            raise ValueError(f"objective returned a non-finite value: {next_value}")
+        next_score = float(objective(*next_point))
+        if not np.isfinite(next_score):
+            raise ValueError(f"objective returned a non-finite score: {next_score}")
         points = np.vstack((points, next_point))
-        values = np.append(values, next_value)
+        scores = np.append(scores, next_score)
         phases.append("bayesian")
         if callback:
-            updated_model = GaussianProcess(length_scale=config.length_scale).fit(
-                points, values
-            )
-            callback(len(points), points.copy(), values.copy(), updated_model)
+            callback(len(points), points.copy(), scores.copy())
 
-    return OptimizationResult(points, values, tuple(phases))
+    return OptimizationResult(points, scores, tuple(phases))

@@ -10,15 +10,15 @@ import urllib.request
 from pathlib import Path
 from unittest import mock
 
-from examples import hardware_objective
+from cdmx_bayesopt import experiment
 from cdmx_bayesopt.colors import parse_rgb_color, reflected_rgb
 from cdmx_bayesopt.hardware import (
+    TCS34725,
     ColorReading,
     HardwareBundle,
     MemoryNeoPixel,
     SimulatedTCS34725,
     SpiNeoPixel,
-    TCS34725,
     encode_ws2812,
     resolve_i2c_bus,
     validate_brightness,
@@ -62,16 +62,14 @@ class FakeSpi:
 
 
 class HardwareTests(unittest.TestCase):
-    def test_workshop_objective_controls_led_and_scores_sensor_color(self):
-        self.assertEqual(
-            hardware_objective.color_from_point(-3, 128, 300), (0, 128, 255)
-        )
+    def test_workshop_objective_controls_led_and_maximizes_sensor_score(self):
+        self.assertEqual(experiment.color_from_point(-3, 128, 300), (0, 128, 255))
         self.assertAlmostEqual(
-            hardware_objective.color_error(
+            experiment.color_match_score(
                 {"red": 55 * 257, "green": 30 * 257, "blue": 100 * 257},
                 (55, 30, 100),
             ),
-            0.0,
+            1.0,
         )
         pixel = MemoryNeoPixel()
         sensor = mock.Mock()
@@ -80,18 +78,18 @@ class HardwareTests(unittest.TestCase):
         )
         devices = HardwareBundle(sensor, pixel, "test sensor", "test pixel", [])
         with (
-            mock.patch.dict("os.environ", {"CDMX_TARGET_RGB": "#371E64"}),
             mock.patch.object(
-                hardware_objective,
+                experiment,
                 "build_hardware",
                 return_value=devices,
             ) as build,
-            mock.patch.object(hardware_objective.time, "sleep") as sleep,
+            mock.patch.object(experiment.time, "sleep") as sleep,
         ):
-            hardware_objective.close_hardware()
-            self.assertAlmostEqual(hardware_objective.measure(12, 34, 220), 0.0)
+            experiment.close_hardware()
+            measure = experiment.objective_for((55, 30, 100))
+            self.assertAlmostEqual(measure(12, 34, 220), 1.0)
             self.assertEqual(pixel.color, (12, 34, 220))
-            hardware_objective.close_hardware()
+            experiment.close_hardware()
         build.assert_called_once_with(
             simulate=False, i2c_bus="auto", spi_bus=3, spi_device=0
         )
@@ -105,20 +103,19 @@ class HardwareTests(unittest.TestCase):
         campaign = (root / "scripts" / "bayesopt.sh").read_text()
         installer = (root / "scripts" / "setup.sh").read_text()
         color_lab = (root / "scripts" / "color-lab.sh").read_text()
-        self.assertIn(
-            "--objective \"$ROOT/examples/hardware_objective.py:measure\"", campaign
-        )
-        self.assertIn("--dimensions 3", campaign)
-        self.assertIn("export CDMX_TARGET_RGB=$1", campaign)
-        self.assertIn("--lower 0 --upper 255", campaign)
+        self.assertIn('"$1" --gif --serve --port 8000', campaign)
+        self.assertNotIn("--dimensions", campaign)
+        self.assertNotIn("--objective", campaign)
         self.assertIn("--serve --port 8000", campaign)
-        self.assertIn('port 8000 proto tcp', installer)
-        self.assertIn("exec \"$COLOR_LAB\"", color_lab)
+        self.assertIn("port 8000 proto tcp", installer)
+        self.assertIn('exec "$COLOR_LAB"', color_lab)
         self.assertIn("systemctl disable --now cdmx-color-lab.service", installer)
         self.assertFalse((root / "deploy" / "cdmx-color-lab.service.in").exists())
 
     def test_rockchip_pinctrl_pins_are_nested_inside_a_function_group(self):
-        overlay = (Path(__file__).parents[1] / "deploy" / "cdmx-zero3w-i2c-gpio.dts").read_text()
+        overlay = (
+            Path(__file__).parents[1] / "deploy" / "cdmx-zero3w-i2c-gpio.dts"
+        ).read_text()
         self.assertIn("cdmx-i2c-gpio {\n\t\t\t\tcdmx_i2c_gpio_pins:", overlay)
 
     def test_setup_includes_system_administration_commands_in_path(self):
@@ -166,9 +163,7 @@ class HardwareTests(unittest.TestCase):
         self.assertEqual(parse_rgb_color("#4A80c0"), (74, 128, 192))
         self.assertEqual(parse_rgb_color("74, 128, 192"), (74, 128, 192))
         self.assertEqual(
-            reflected_rgb(
-                {"red": 74 * 257, "green": 128 * 257, "blue": 192 * 257}
-            ),
+            reflected_rgb({"red": 74 * 257, "green": 128 * 257, "blue": 192 * 257}),
             (74, 128, 192),
         )
         with self.assertRaises(ValueError):

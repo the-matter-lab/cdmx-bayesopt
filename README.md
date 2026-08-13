@@ -2,9 +2,10 @@
 
 🇲🇽 [Español](README.md) · 🇬🇧 [English](README.en.md)
 
-Experimento ligero de optimización bayesiana para una Radxa ZERO 3W de 1 GB.
-Un NeoPixel ilumina una superficie, el TCS34725 mide el color reflejado y
-BayesOpt ajusta rojo, verde y azul para acercarse a un color objetivo.
+Experimento enfocado de optimización bayesiana con tres variables para una
+Radxa ZERO 3W de 1 GB. Un NeoPixel ilumina una superficie, el TCS34725 mide el
+color reflejado y BayesOpt ajusta rojo, verde y azul para maximizar una métrica
+de coincidencia de color entre 0 y 1 para el objetivo solicitado.
 
 ## Taller
 
@@ -29,7 +30,8 @@ Para optimizar, primero detenga Color Lab y ejecute:
 
 BayesOpt controla I²C/SPI directamente; no inicia Color Lab. La campaña se ve
 en `http://equipoN.local:8000/` y `Ctrl-C` la detiene. Las salidas quedan en
-`runs/color-campaign/`.
+`runs/color-campaign/`. El GP siempre recibe exactamente tres entradas:
+`(rojo, verde, azul)`. No hay otro optimizador ni una demo matemática aparte.
 
 ## Cableado fijo (placa apagada)
 
@@ -57,11 +59,10 @@ sudo reboot
 el entorno Python. También elimina el antiguo servicio Color Lab automático.
 Después del reinicio se usan solamente `color-lab.sh` y `bayesopt.sh`.
 
-Sin hardware, pruebe la interfaz con `./scripts/color-lab.sh --simulate`. La
-demo matemática 2D se ejecuta directamente con:
+Sin hardware, pruebe el sitio Color Lab con:
 
 ```bash
-.venv/bin/cdmx-bayesopt --iterations 20 --gif --serve --output runs/demo
+./scripts/color-lab.sh --simulate
 ```
 
 ## Desarrollo

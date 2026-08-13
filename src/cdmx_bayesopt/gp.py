@@ -1,4 +1,4 @@
-"""Small Gaussian-process surrogate with expected improvement."""
+"""Small Gaussian-process surrogate for maximizing the sensor score."""
 
 from __future__ import annotations
 
@@ -17,11 +17,7 @@ def _normal_cdf(values: np.ndarray) -> np.ndarray:
     t = 1.0 / (1.0 + 0.2316419 * absolute)
     polynomial = t * (
         0.319381530
-        + t
-        * (
-            -0.356563782
-            + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))
-        )
+        + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429)))
     )
     positive = 1.0 - _normal_pdf(absolute) * polynomial
     return np.where(values >= 0.0, positive, 1.0 - positive)
@@ -29,7 +25,7 @@ def _normal_cdf(values: np.ndarray) -> np.ndarray:
 
 @dataclass
 class GaussianProcess:
-    """RBF Gaussian process sized for short workshop campaigns."""
+    """RBF Gaussian process sized for short RGB workshop campaigns."""
 
     length_scale: float = 0.72
     noise: float = 1e-6
@@ -38,22 +34,22 @@ class GaussianProcess:
         squared_distance = ((left[:, None, :] - right[None, :, :]) ** 2).sum(axis=2)
         return np.exp(-0.5 * squared_distance / (self.length_scale**2))
 
-    def fit(self, points: np.ndarray, values: np.ndarray) -> "GaussianProcess":
+    def fit(self, points: np.ndarray, scores: np.ndarray) -> GaussianProcess:
         points = np.asarray(points, dtype=float)
-        values = np.asarray(values, dtype=float)
-        if points.ndim != 2 or points.shape[1] < 1:
-            raise ValueError("points must have shape (n, dimensions)")
-        if values.shape != (len(points),):
-            raise ValueError("values must have shape (n,)")
+        scores = np.asarray(scores, dtype=float)
+        if points.ndim != 2 or points.shape[1] != 3:
+            raise ValueError("points must have shape (n, 3) for red, green, blue")
+        if scores.shape != (len(points),):
+            raise ValueError("scores must have shape (n,)")
         if len(points) < 2:
             raise ValueError("at least two observations are required")
 
         self.points_ = points
-        self.value_mean_ = float(values.mean())
-        self.value_scale_ = float(values.std())
-        if self.value_scale_ < 1e-12:
-            self.value_scale_ = 1.0
-        normalized = (values - self.value_mean_) / self.value_scale_
+        self.score_mean_ = float(scores.mean())
+        self.score_scale_ = float(scores.std())
+        if self.score_scale_ < 1e-12:
+            self.score_scale_ = 1.0
+        normalized = (scores - self.score_mean_) / self.score_scale_
         covariance = self._kernel(points, points)
         jitter = self.noise
         for _ in range(7):
@@ -80,19 +76,19 @@ class GaussianProcess:
         normalized_mean = cross.T @ self.alpha_
         solved = np.linalg.solve(self.cholesky_, cross)
         normalized_variance = np.maximum(1.0 - (solved * solved).sum(axis=0), 1e-12)
-        mean = self.value_mean_ + self.value_scale_ * normalized_mean
-        deviation = self.value_scale_ * np.sqrt(normalized_variance)
+        mean = self.score_mean_ + self.score_scale_ * normalized_mean
+        deviation = self.score_scale_ * np.sqrt(normalized_variance)
         return mean, deviation
 
 
 def expected_improvement(
     mean: np.ndarray,
     deviation: np.ndarray,
-    best_value: float,
+    best_score: float,
     exploration: float = 0.01,
 ) -> np.ndarray:
-    """Expected improvement for a minimization objective."""
-    improvement = best_value - mean - exploration
+    """Expected improvement for maximizing the color-match score."""
+    improvement = mean - best_score - exploration
     safe_deviation = np.maximum(deviation, 1e-12)
     z_score = improvement / safe_deviation
     acquisition = improvement * _normal_cdf(z_score) + safe_deviation * _normal_pdf(
@@ -104,13 +100,13 @@ def expected_improvement(
 def propose_next(
     model: GaussianProcess,
     observed_points: np.ndarray,
-    observed_values: np.ndarray,
+    observed_scores: np.ndarray,
     candidates: np.ndarray,
     exploration: float,
 ) -> np.ndarray:
     mean, deviation = model.posterior(candidates)
     acquisition = expected_improvement(
-        mean, deviation, float(observed_values.min()), exploration
+        mean, deviation, float(observed_scores.max()), exploration
     )
     distances = ((candidates[:, None, :] - observed_points[None, :, :]) ** 2).sum(
         axis=2

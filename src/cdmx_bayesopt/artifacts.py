@@ -9,35 +9,42 @@ from pathlib import Path
 
 import numpy as np
 
-from .gp import GaussianProcess
-from .objectives import synthetic_surface
 from .runner import OptimizationResult
 
 
 def write_history(
     directory: Path,
     points: np.ndarray,
-    values: np.ndarray,
+    scores: np.ndarray,
     phases: tuple[str, ...] | list[str],
 ) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    best_so_far = np.minimum.accumulate(values)
+    best_so_far = np.maximum.accumulate(scores)
     with (directory / "history.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
-        variables = [f"x{index}" for index in range(1, points.shape[1] + 1)]
-        writer.writerow(["iteration", "phase", *variables, "objective", "best_so_far"])
-        for index, (point, value, best, phase) in enumerate(
-            zip(points, values, best_so_far, phases), start=1
+        writer.writerow(
+            [
+                "iteration",
+                "phase",
+                "red",
+                "green",
+                "blue",
+                "sensor_score",
+                "best_so_far",
+            ]
+        )
+        for index, (point, score, best, phase) in enumerate(
+            zip(points, scores, best_so_far, phases), start=1
         ):
-            writer.writerow([index, phase, *point, value, best])
+            writer.writerow([index, phase, *point, score, best])
 
 
-def write_state(directory: Path, points: np.ndarray, values: np.ndarray) -> None:
-    best_index = int(np.argmin(values))
+def write_state(directory: Path, points: np.ndarray, scores: np.ndarray) -> None:
+    best_index = int(np.argmax(scores))
     state = {
-        "iteration": len(values),
-        "best_point": [float(item) for item in points[best_index]],
-        "best_value": float(values[best_index]),
+        "iteration": len(scores),
+        "best_rgb": [float(item) for item in points[best_index]],
+        "best_score": float(scores[best_index]),
     }
     (directory / "state.json").write_text(
         json.dumps(state, indent=2) + "\n", encoding="utf-8"
@@ -46,10 +53,10 @@ def write_state(directory: Path, points: np.ndarray, values: np.ndarray) -> None
 
 def write_summary(directory: Path, result: OptimizationResult, seed: int) -> None:
     summary = {
-        "iterations": len(result.values),
+        "iterations": len(result.scores),
         "seed": seed,
-        "best_point": [float(item) for item in result.best_point],
-        "best_value": result.best_value,
+        "best_rgb": [float(item) for item in result.best_point],
+        "best_score": result.best_score,
     }
     (directory / "summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
@@ -74,7 +81,7 @@ main{max-width:1100px;margin:auto;padding:18px}img{max-width:100%;border-radius:
 async function refresh(){
  document.querySelector('#plot').src='latest.png?t='+Date.now();
  try{const s=await fetch('state.json?t='+Date.now()).then(r=>r.json());
- document.querySelector('#state').textContent=`Step ${s.iteration} · best ${s.best_value.toFixed(5)} · (${s.best_point.map(v=>v.toFixed(3)).join(', ')})`;}
+ document.querySelector('#state').textContent=`Step ${s.iteration} · best score ${s.best_score.toFixed(5)} · RGB (${s.best_rgb.map(v=>Math.round(v)).join(', ')})`;}
  catch(e){}
 }
 setInterval(refresh,1500);refresh();
@@ -86,85 +93,59 @@ def render_frame(
     directory: Path,
     iteration: int,
     points: np.ndarray,
-    values: np.ndarray,
-    model: GaussianProcess | None,
-    bounds: tuple[float, float],
-    synthetic: bool,
+    scores: np.ndarray,
 ) -> Path:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    figure, (surface_axis, progress_axis) = plt.subplots(1, 2, figsize=(10, 4.8), dpi=110)
+    figure, (rgb_axis, progress_axis) = plt.subplots(1, 2, figsize=(10, 4.8), dpi=110)
     figure.patch.set_facecolor("#0b1020")
-    for plot_axis in (surface_axis, progress_axis):
+    for plot_axis in (rgb_axis, progress_axis):
         plot_axis.set_facecolor("#111827")
         plot_axis.tick_params(colors="#cbd5e1")
         for spine in plot_axis.spines.values():
             spine.set_color("#475569")
 
-    if points.shape[1] == 2:
-        lower, upper = bounds
-        axis = np.linspace(lower, upper, 72)
-        xx, yy = np.meshgrid(axis, axis)
-        grid = np.column_stack((xx.ravel(), yy.ravel()))
-        if synthetic:
-            surface = synthetic_surface(grid)
-            surface_title = "True synthetic surface"
-        elif model is not None:
-            surface, _ = model.posterior(grid)
-            surface_title = "Gaussian-process prediction"
-        else:
-            surface = np.zeros(len(grid))
-            surface_title = "Initial measurements"
-        contour = surface_axis.contourf(
-            xx, yy, surface.reshape(xx.shape), levels=24, cmap="viridis"
+    if points.ndim != 2 or points.shape[1] != 3:
+        raise ValueError("plot data must contain red, green, and blue columns")
+    palette = ("#ff6577", "#55e6a5", "#5ba9ff")
+    names = ("LED red", "LED green", "LED blue")
+    steps = np.arange(1, len(points) + 1)
+    for index, (label, color) in enumerate(zip(names, palette)):
+        rgb_axis.plot(
+            steps,
+            points[:, index],
+            marker="o",
+            markersize=3,
+            color=color,
+            label=label,
         )
-        surface_axis.scatter(
-            points[:, 0], points[:, 1], c="white", edgecolors="#111827", s=42
-        )
-        surface_axis.scatter(
-            points[-1, 0],
-            points[-1, 1],
-            marker="*",
-            c="#fb7185",
-            s=170,
-            edgecolors="white",
-        )
-        best = int(np.argmin(values))
-        surface_axis.scatter(points[best, 0], points[best, 1], marker="x", c="#facc15", s=100, linewidths=3)
-        surface_axis.set_title(surface_title, color="white")
-        surface_axis.set_xlabel("x₁", color="white")
-        surface_axis.set_ylabel("x₂", color="white")
-        colorbar = figure.colorbar(contour, ax=surface_axis, shrink=0.82)
-        colorbar.ax.tick_params(colors="#cbd5e1")
-    else:
-        palette = ("#ff6577", "#55e6a5", "#5ba9ff", "#facc15", "#c084fc")
-        names = ("LED red", "LED green", "LED blue") if points.shape[1] == 3 else ()
-        steps = np.arange(1, len(points) + 1)
-        for index in range(points.shape[1]):
-            label = names[index] if names else f"x{index + 1}"
-            surface_axis.plot(
-                steps,
-                points[:, index],
-                marker="o",
-                markersize=3,
-                color=palette[index % len(palette)],
-                label=label,
-            )
-        surface_axis.set_title("Parameters tested", color="white")
-        surface_axis.set_xlabel("Experiment", color="white")
-        surface_axis.set_ylabel("Value", color="white")
-        surface_axis.grid(alpha=0.2)
-        surface_axis.legend(frameon=False, labelcolor="white")
+    rgb_axis.set_title("RGB values tested", color="white")
+    rgb_axis.set_xlabel("Experiment", color="white")
+    rgb_axis.set_ylabel("LED value", color="white")
+    rgb_axis.set_ylim(0, 255)
+    rgb_axis.grid(alpha=0.2)
+    rgb_axis.legend(frameon=False, labelcolor="white")
 
-    progress_axis.plot(np.arange(1, len(values) + 1), np.minimum.accumulate(values), color="#facc15", marker="o", markersize=3)
-    progress_axis.set_title("Best objective found", color="white")
+    progress_axis.plot(
+        np.arange(1, len(scores) + 1),
+        np.maximum.accumulate(scores),
+        color="#facc15",
+        marker="o",
+        markersize=3,
+    )
+    progress_axis.set_title("Best color-match score", color="white")
     progress_axis.set_xlabel("Experiment", color="white")
-    progress_axis.set_ylabel("Objective (lower is better)", color="white")
+    progress_axis.set_ylabel("Sensor score (higher is better)", color="white")
+    progress_axis.set_ylim(0, 1)
     progress_axis.grid(alpha=0.2)
-    figure.suptitle(f"CDMX Bayesian optimization · step {iteration}", color="white", fontsize=14)
+    figure.suptitle(
+        f"CDMX Bayesian optimization · step {iteration}",
+        color="white",
+        fontsize=14,
+    )
     figure.tight_layout()
 
     frames = directory / "frames"
