@@ -2,12 +2,20 @@
 
 🇲🇽 [Español](README.md) · 🇬🇧 [English](README.en.md)
 
-A focused three-variable Bayesian-optimization experiment for a 1 GB Radxa
-ZERO 3W. A NeoPixel illuminates a surface, the TCS34725 measures reflected
-color, and BayesOpt adjusts LED red, green, and blue to maximize a 0–1 color
-match score for the requested target.
+A Bayesian-optimization workshop using a Radxa ZERO 3W, one NeoPixel, and a
+TCS34725 color sensor. The three variables are the LED channels `(R, G, B)`.
+The sensor produces another `(R, G, B)` color, and BayesOpt searches for the
+LED setting that minimizes its distance from the requested target.
 
-## Workshop
+The cost function is Euclidean RGB distance:
+
+```text
+distance = √((Rt − Rm)² + (Gt − Gm)² + (Bt − Bm)²)
+```
+
+A distance of `0` is a perfect match; lower values are better.
+
+## 1. Explore Color Lab
 
 From a terminal in the shared desktop:
 
@@ -17,21 +25,48 @@ cd cdmx-bayesopt
 ./scripts/color-lab.sh
 ```
 
-Open `http://equipoN.local:8010/` to change the LED and see the sensor. This is
-a foreground command: `Ctrl-C` stops **both the site and sampling**. No Color
-Lab service continues consuming resources in the background.
+Open `http://equipoN.local:8010/`. Color Lab lets participants choose the LED
+color and intensity, see RGB sensor readings, clear the history, and set the
+graph maximum. `Ctrl-C` stops the site and sampling. Color Lab works
+independently of the BayesOpt exercises.
 
-To optimize, stop Color Lab first and run:
+## 2. Complete the three exercises
+
+The only BayesOpt concepts live under `src/cdmx_bayesopt/bo/`:
+
+1. [`metric.py`](src/cdmx_bayesopt/bo/metric.py): implement RGB distance.
+2. [`prior.py`](src/cdmx_bayesopt/bo/prior.py): implement the Gaussian
+   process RBF prior.
+3. [`sampling.py`](src/cdmx_bayesopt/bo/sampling.py): choose the next sample
+   with expected improvement.
+
+Each function contains `Put your solution here` and intentionally raises
+`NotImplementedError`. This makes each team’s task explicit. Running the
+campaign before completing the exercises reports `workshop exercise
+incomplete` instead of silently running an incorrect optimizer.
+
+## 3. Run BayesOpt
+
+Stop Color Lab to release the GPIO devices, then run:
 
 ```bash
 ./scripts/bayesopt.sh '#4A80C0'
 # also accepted: ./scripts/bayesopt.sh '74,128,192'
 ```
 
-BayesOpt controls I²C/SPI directly; it does not start Color Lab. Follow the
-campaign at `http://equipoN.local:8000/`; `Ctrl-C` stops it. Outputs are saved
-under `runs/color-campaign/`. The GP always receives exactly three inputs:
-`(red, green, blue)`. There is no separate mathematical optimizer or demo.
+Follow the campaign at `http://equipoN.local:8000/`. Its history is saved
+under `runs/color-campaign/` with the LED RGB, measured RGB, and distance. The
+GP always receives three inputs: red, green, and blue.
+
+## Code organization
+
+`src/cdmx_bayesopt/` has only three feature folders:
+
+```text
+bo/      metric, GP prior, and sampling algorithm
+utils/   shared hardware, campaign, CLI, colors, and artifacts
+web/     only the Color Lab application and its HTML
+```
 
 ## Fixed wiring (power off first)
 
@@ -40,10 +75,9 @@ under `runs/color-campaign/`. The GP always receives exactly three inputs:
 | TCS34725 | VCC / GND / SCL / SDA | **4 / 6 / 8 / 10** |
 | NeoPixel | VCC / DIN / GND | **2 / 19 / 20** |
 
-The image always keeps `i2c-gpio-cdmx` active on pins 8/10 and `SPI3_MOSI` on
-pin 19. Starting or stopping Color Lab does not change the GPIO configuration.
-A 74AHCT125 or 74HCT245 level shifter is recommended for DIN when the NeoPixel
-uses 5 V.
+The image keeps `i2c-gpio-cdmx` active on pins 8/10 and `SPI3_MOSI` active on
+pin 19. A 74AHCT125 or 74HCT245 level shifter is recommended for DIN when the
+NeoPixel uses 5 V.
 
 ## Install without the workshop image
 
@@ -56,15 +90,7 @@ cd cdmx-bayesopt
 sudo reboot
 ```
 
-`setup.sh` permanently installs the overlay, I²C module, SPI3, permissions, and
-Python environment. It also removes the old automatic Color Lab service. After
-reboot, use only `color-lab.sh` and `bayesopt.sh`.
-
-Without hardware, test the Color Lab website with:
-
-```bash
-./scripts/color-lab.sh --simulate
-```
+Without hardware, test Color Lab with `./scripts/color-lab.sh --simulate`.
 
 ## Development
 

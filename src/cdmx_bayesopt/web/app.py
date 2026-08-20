@@ -14,13 +14,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from urllib.parse import urlsplit
 
-from .colors import color_hex, parse_rgb_color
-from .hardware import HardwareBundle, RGB, build_hardware, validate_brightness, validate_rgb
+from cdmx_bayesopt.utils.colors import color_hex, parse_rgb_color
+from cdmx_bayesopt.utils.hardware import (
+    RGB,
+    HardwareBundle,
+    build_hardware,
+    validate_brightness,
+    validate_rgb,
+)
 
 
 def parse_hex_color(value: str) -> RGB:
     """Compatibility helper for callers that require exactly ``#RRGGBB``."""
-    if not isinstance(value, str) or len(value.strip()) != 7 or not value.strip().startswith("#"):
+    if (
+        not isinstance(value, str)
+        or len(value.strip()) != 7
+        or not value.strip().startswith("#")
+    ):
         raise ValueError("color must use #RRGGBB format")
     try:
         return parse_rgb_color(value)
@@ -209,7 +219,7 @@ class ColorLabHandler(BaseHTTPRequestHandler):
         try:
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
-                raise ValueError("JSON body must be an object")
+                raise TypeError("JSON body must be an object")
             if "color" in body:
                 color = parse_hex_color(body["color"])
             else:

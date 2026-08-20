@@ -10,9 +10,9 @@ import urllib.request
 from pathlib import Path
 from unittest import mock
 
-from cdmx_bayesopt import experiment
-from cdmx_bayesopt.colors import parse_rgb_color, reflected_rgb
-from cdmx_bayesopt.hardware import (
+from cdmx_bayesopt.utils import experiment
+from cdmx_bayesopt.utils.colors import parse_rgb_color, reflected_rgb
+from cdmx_bayesopt.utils.hardware import (
     TCS34725,
     ColorReading,
     HardwareBundle,
@@ -24,7 +24,7 @@ from cdmx_bayesopt.hardware import (
     validate_brightness,
     validate_rgb,
 )
-from cdmx_bayesopt.webapp import ColorLab, ColorLabServer, color_hex, parse_hex_color
+from cdmx_bayesopt.web.app import ColorLab, ColorLabServer, color_hex, parse_hex_color
 
 
 class FakeBus:
@@ -62,15 +62,8 @@ class FakeSpi:
 
 
 class HardwareTests(unittest.TestCase):
-    def test_workshop_objective_controls_led_and_maximizes_sensor_score(self):
+    def test_workshop_measurement_controls_led_and_returns_sensor_rgb(self):
         self.assertEqual(experiment.color_from_point(-3, 128, 300), (0, 128, 255))
-        self.assertAlmostEqual(
-            experiment.color_match_score(
-                {"red": 55 * 257, "green": 30 * 257, "blue": 100 * 257},
-                (55, 30, 100),
-            ),
-            1.0,
-        )
         pixel = MemoryNeoPixel()
         sensor = mock.Mock()
         sensor.read.return_value = ColorReading(
@@ -86,8 +79,8 @@ class HardwareTests(unittest.TestCase):
             mock.patch.object(experiment.time, "sleep") as sleep,
         ):
             experiment.close_hardware()
-            measure = experiment.objective_for((55, 30, 100))
-            self.assertAlmostEqual(measure(12, 34, 220), 1.0)
+            measure = experiment.measurement_function()
+            self.assertEqual(measure(12, 34, 220), (55, 30, 100))
             self.assertEqual(pixel.color, (12, 34, 220))
             experiment.close_hardware()
         build.assert_called_once_with(

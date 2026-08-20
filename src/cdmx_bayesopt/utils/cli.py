@@ -18,14 +18,14 @@ from .artifacts import (
     write_state,
     write_summary,
 )
+from .campaign import OptimizationConfig, run_optimization
 from .colors import parse_rgb_color
-from .experiment import objective_for
-from .runner import OptimizationConfig, run_optimization
+from .experiment import measurement_function
 
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
-        description="Optimize three LED RGB values against the reflected-color sensor."
+        description="Minimize reflected RGB distance by changing three LED channels."
     )
     result.add_argument("target", help="target reflected color as #RRGGBB or R,G,B")
     result.add_argument("--iterations", type=int, default=18)
@@ -33,7 +33,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--seed", type=int, default=2026)
     result.add_argument("--candidates", type=int, default=1200)
     result.add_argument("--length-scale", type=float, default=45.0)
-    result.add_argument("--exploration", type=float, default=0.01)
+    result.add_argument("--exploration", type=float, default=0.1)
     result.add_argument("--output", type=Path, default=Path("runs/color-campaign"))
     result.add_argument(
         "--pause", type=float, default=0.2, help="seconds between experiments"
@@ -71,7 +71,6 @@ def main(argv: list[str] | None = None) -> int:
     if server:
         print(f"dashboard=http://0.0.0.0:{args.port}/", flush=True)
 
-    objective = objective_for(target)
     config = OptimizationConfig(
         total_iterations=args.iterations,
         initial_points=args.initial,
@@ -82,37 +81,50 @@ def main(argv: list[str] | None = None) -> int:
     )
     phases: list[str] = []
 
-    def update(step, points, scores):
-        while len(phases) < len(scores):
+    def update(step, points, measurements, costs):
+        while len(phases) < len(costs):
             phases.append("initial" if len(phases) < args.initial else "bayesian")
-        write_history(args.output, points, scores, phases)
-        write_state(args.output, points, scores)
+        write_history(args.output, points, measurements, costs, phases)
+        write_state(args.output, target, points, measurements, costs)
         if not args.no_plot:
-            render_frame(args.output, step, points, scores)
-        best = int(scores.argmax())
-        point = ",".join(f"{value:.4f}" for value in points[-1])
+            render_frame(args.output, step, points, costs)
+        best = int(costs.argmin())
+        led = ",".join(f"{value:.1f}" for value in points[-1])
+        sensor = ",".join(str(int(value)) for value in measurements[-1])
         print(
-            f"step={step:02d} rgb=({point}) score={scores[-1]:.6f} "
-            f"best={scores[best]:.6f}",
+            f"step={step:02d} led=({led}) sensor=({sensor}) "
+            f"distance={costs[-1]:.3f} best={costs[best]:.3f}",
             flush=True,
         )
         if args.pause:
             time.sleep(args.pause)
 
     try:
-        result = run_optimization(objective, config, callback=update)
-        write_summary(args.output, result, args.seed)
+        result = run_optimization(
+            measurement_function(),
+            target,
+            config,
+            callback=update,
+        )
+        write_summary(args.output, result, args.seed, target)
         if args.gif and not args.no_plot:
             create_gif(args.output)
+    except NotImplementedError as exc:
+        print(f"workshop exercise incomplete: {exc}", file=sys.stderr)
+        if server:
+            server.shutdown()
+        return 3
     except (ImportError, TypeError, ValueError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         if server:
             server.shutdown()
         return 2
 
+    best_led = ",".join(f"{value:.1f}" for value in result.best_point)
+    best_sensor = ",".join(str(int(value)) for value in result.best_measurement)
     print(
-        f"best_rgb=({','.join(f'{value:.5f}' for value in result.best_point)}) "
-        f"sensor_score={result.best_score:.7f} output={args.output}",
+        f"best_led_rgb=({best_led}) best_sensor_rgb=({best_sensor}) "
+        f"rgb_distance={result.best_distance:.3f} output={args.output}",
         flush=True,
     )
     if server:

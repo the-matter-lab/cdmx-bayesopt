@@ -1,4 +1,4 @@
-"""Hardware adapters for the Radxa color experiment.
+"""Shared hardware adapters for the Radxa color experiment.
 
 The module intentionally imports ``smbus`` and ``spidev`` only when real
 hardware is requested. This keeps simulation and unit tests portable.
@@ -12,8 +12,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
-
+from typing import ClassVar, Protocol
 
 RGB = tuple[int, int, int]
 I2CBus = int | str
@@ -31,7 +30,7 @@ def resolve_i2c_bus(
     """
 
     if isinstance(bus, bool):
-        raise ValueError("I2C bus must be a non-negative number or 'auto'")
+        raise TypeError("I2C bus must be a non-negative number or 'auto'")
     if isinstance(bus, int):
         if bus < 0:
             raise ValueError("I2C bus must be non-negative")
@@ -42,9 +41,7 @@ def resolve_i2c_bus(
         try:
             result = int(value, 10)
         except ValueError as exc:
-            raise ValueError(
-                "I2C bus must be a non-negative number or 'auto'"
-            ) from exc
+            raise ValueError("I2C bus must be a non-negative number or 'auto'") from exc
         if result < 0:
             raise ValueError("I2C bus must be non-negative")
         return result
@@ -156,7 +153,12 @@ class TCS34725:
     ENABLE_PON = 0x01
     ENABLE_AEN = 0x02
     STATUS_AVALID = 0x01
-    GAIN_CODES = {1: 0x00, 4: 0x01, 16: 0x02, 60: 0x03}
+    GAIN_CODES: ClassVar[dict[int, int]] = {
+        1: 0x00,
+        4: 0x01,
+        16: 0x02,
+        60: 0x03,
+    }
 
     def __init__(
         self,
@@ -208,9 +210,7 @@ class TCS34725:
 
     def read(self) -> ColorReading:
         with self._lock:
-            status = self._bus.read_byte_data(
-                self.address, self._register(self.STATUS)
-            )
+            status = self._bus.read_byte_data(self.address, self._register(self.STATUS))
             if not status & self.STATUS_AVALID:
                 raise OSError("TCS34725 sample is not ready")
             data = self._bus.read_i2c_block_data(
@@ -418,9 +418,7 @@ def build_hardware(
     try:
         resolved_i2c_bus = resolve_i2c_bus(i2c_bus)
         sensor: ColorSensor = TCS34725(resolved_i2c_bus, i2c_address)
-        sensor_backend = (
-            f"TCS34725 /dev/i2c-{resolved_i2c_bus} @ 0x{i2c_address:02x}"
-        )
+        sensor_backend = f"TCS34725 /dev/i2c-{resolved_i2c_bus} @ 0x{i2c_address:02x}"
     except (ImportError, OSError, ValueError) as exc:
         message = f"Color sensor unavailable: {exc}"
         sensor = UnavailableSensor(message)

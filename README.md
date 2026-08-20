@@ -2,12 +2,20 @@
 
 🇲🇽 [Español](README.md) · 🇬🇧 [English](README.en.md)
 
-Experimento enfocado de optimización bayesiana con tres variables para una
-Radxa ZERO 3W de 1 GB. Un NeoPixel ilumina una superficie, el TCS34725 mide el
-color reflejado y BayesOpt ajusta rojo, verde y azul para maximizar una métrica
-de coincidencia de color entre 0 y 1 para el objetivo solicitado.
+Taller de optimización bayesiana con una Radxa ZERO 3W, un NeoPixel y un
+sensor de color TCS34725. Las tres variables son la intensidad de los canales
+del LED `(R, G, B)`. El sensor produce otro color `(R, G, B)` y BayesOpt busca
+el LED que minimiza la distancia al color objetivo.
 
-## Taller
+La función de costo es la distancia euclidiana en RGB:
+
+```text
+distancia = √((Rt − Rm)² + (Gt − Gm)² + (Bt − Bm)²)
+```
+
+Una distancia `0` es una coincidencia perfecta; valores menores son mejores.
+
+## 1. Explorar Color Lab
 
 Desde una terminal del escritorio compartido:
 
@@ -17,21 +25,48 @@ cd cdmx-bayesopt
 ./scripts/color-lab.sh
 ```
 
-Abra `http://equipoN.local:8010/` para cambiar el LED y ver el sensor. Este
-comando corre en primer plano: `Ctrl-C` detiene **el sitio y el muestreo**. No
-queda un servicio Color Lab consumiendo recursos en segundo plano.
+Abra `http://equipoN.local:8010/`. Color Lab permite elegir el color y la
+intensidad del LED, ver las lecturas RGB del sensor, limpiar el historial y
+ajustar el máximo de la gráfica. `Ctrl-C` detiene el sitio y el muestreo. Color
+Lab funciona de manera independiente a los ejercicios de BayesOpt.
 
-Para optimizar, primero detenga Color Lab y ejecute:
+## 2. Completar los tres ejercicios
+
+Los únicos conceptos de BayesOpt viven en `src/cdmx_bayesopt/bo/`:
+
+1. [`metric.py`](src/cdmx_bayesopt/bo/metric.py): implementar la distancia RGB.
+2. [`prior.py`](src/cdmx_bayesopt/bo/prior.py): implementar el prior RBF del
+   proceso gaussiano.
+3. [`sampling.py`](src/cdmx_bayesopt/bo/sampling.py): elegir la siguiente
+   muestra con expected improvement.
+
+Cada función contiene `Put your solution here` y lanza
+`NotImplementedError` intencionalmente. Esto permite que cada equipo vea con
+claridad qué debe completar. Al ejecutar antes de resolverlas aparece
+`workshop exercise incomplete` en lugar de comenzar una campaña incorrecta.
+
+## 3. Ejecutar BayesOpt
+
+Detenga Color Lab para liberar GPIO y ejecute:
 
 ```bash
 ./scripts/bayesopt.sh '#4A80C0'
 # también acepta: ./scripts/bayesopt.sh '74,128,192'
 ```
 
-BayesOpt controla I²C/SPI directamente; no inicia Color Lab. La campaña se ve
-en `http://equipoN.local:8000/` y `Ctrl-C` la detiene. Las salidas quedan en
-`runs/color-campaign/`. El GP siempre recibe exactamente tres entradas:
-`(rojo, verde, azul)`. No hay otro optimizador ni una demo matemática aparte.
+La campaña aparece en `http://equipoN.local:8000/`. El historial se guarda en
+`runs/color-campaign/` con el RGB del LED, el RGB medido y la distancia. El GP
+siempre recibe tres entradas: rojo, verde y azul.
+
+## Organización del código
+
+Dentro de `src/cdmx_bayesopt/` hay solamente tres carpetas funcionales:
+
+```text
+bo/      métrica, prior GP y algoritmo de muestreo
+utils/   hardware, campaña, CLI, colores y artefactos compartidos
+web/     únicamente la aplicación Color Lab y su HTML
+```
 
 ## Cableado fijo (placa apagada)
 
@@ -40,13 +75,13 @@ en `http://equipoN.local:8000/` y `Ctrl-C` la detiene. Las salidas quedan en
 | TCS34725 | VCC / GND / SCL / SDA | **4 / 6 / 8 / 10** |
 | NeoPixel | VCC / DIN / GND | **2 / 19 / 20** |
 
-La imagen mantiene siempre activos `i2c-gpio-cdmx` en los pines 8/10 y
-`SPI3_MOSI` en el pin 19. Encender o apagar Color Lab no cambia los GPIO. Se
-recomienda un 74AHCT125 o 74HCT245 para DIN si el NeoPixel usa 5 V.
+La imagen mantiene activos `i2c-gpio-cdmx` en los pines 8/10 y `SPI3_MOSI` en
+el pin 19. Se recomienda un 74AHCT125 o 74HCT245 para DIN si el NeoPixel usa
+5 V.
 
 ## Instalación sin la imagen del taller
 
-En RadxaOS, una sola vez y desde una sesión donde `sudo` esté permitido:
+En RadxaOS, una sola vez desde una sesión donde `sudo` esté permitido:
 
 ```bash
 git clone https://github.com/the-matter-lab/cdmx-bayesopt.git
@@ -55,15 +90,7 @@ cd cdmx-bayesopt
 sudo reboot
 ```
 
-`setup.sh` instala permanentemente el overlay, el módulo I²C, SPI3, permisos y
-el entorno Python. También elimina el antiguo servicio Color Lab automático.
-Después del reinicio se usan solamente `color-lab.sh` y `bayesopt.sh`.
-
-Sin hardware, pruebe el sitio Color Lab con:
-
-```bash
-./scripts/color-lab.sh --simulate
-```
+Sin hardware, pruebe Color Lab con `./scripts/color-lab.sh --simulate`.
 
 ## Desarrollo
 

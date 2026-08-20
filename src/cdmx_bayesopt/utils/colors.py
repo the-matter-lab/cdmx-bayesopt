@@ -10,7 +10,7 @@ from .hardware import RGB, validate_rgb
 def parse_rgb_color(value: str) -> RGB:
     """Parse ``#RRGGBB`` or ``R,G,B`` into one 8-bit RGB tuple."""
     if not isinstance(value, str):
-        raise ValueError("color must use #RRGGBB or R,G,B format")
+        raise TypeError("color must use #RRGGBB or R,G,B format")
     value = value.strip()
     if len(value) == 7 and value.startswith("#"):
         try:

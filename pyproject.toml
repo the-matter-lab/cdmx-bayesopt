@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cdmx-bayesopt"
-version = "0.4.0"
+version = "0.5.0"
 description = "RGB sensor Bayesian optimization for the CDMX Radxa workshop"
 readme = "README.en.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
-authors = [{name = "Aspuru-Guzik Group"}]
+authors = [{name = "Matter Lab"}]
 dependencies = ["numpy>=1.24,<3"]
 
 [project.optional-dependencies]
@@ -18,8 +18,8 @@ hardware = ["smbus2>=0.5,<1", "spidev>=3.6,<4"]
 dev = []
 
 [project.scripts]
-cdmx-bayesopt = "cdmx_bayesopt.cli:main"
-cdmx-color-lab = "cdmx_bayesopt.webapp:main"
+cdmx-bayesopt = "cdmx_bayesopt.utils.cli:main"
+cdmx-color-lab = "cdmx_bayesopt.web.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

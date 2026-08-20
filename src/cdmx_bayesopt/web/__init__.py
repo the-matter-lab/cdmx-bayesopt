@@ -1,1 +1,1 @@
-"""Static resources for the Radxa color laboratory."""
+"""Color Lab web application and static resources."""
