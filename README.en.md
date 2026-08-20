@@ -30,20 +30,23 @@ color and intensity, see RGB sensor readings, clear the history, and set the
 graph maximum. `Ctrl-C` stops the site and sampling. Color Lab works
 independently of the BayesOpt exercises.
 
-## 2. Complete the three exercises
+## 2. Complete the four steps
 
 The only BayesOpt concepts live under `src/bo/`:
 
-1. [`metric.py`](src/bo/metric.py): implement RGB distance.
-2. [`prior.py`](src/bo/prior.py): implement the Gaussian
+1. [`search_space.py`](src/bo/search_space.py): define the red, green, and blue
+   bounds.
+2. [`metric.py`](src/bo/metric.py): implement RGB distance.
+3. [`prior.py`](src/bo/prior.py): implement the Gaussian
    process RBF prior.
-3. [`sampling.py`](src/bo/sampling.py): choose the next sample
+4. [`sampling.py`](src/bo/sampling.py): choose the next sample
    with expected improvement.
 
-Each function contains `Put your solution here` and intentionally raises
-`NotImplementedError`. This makes each team’s task explicit. Running the
-campaign before completing the exercises reports `workshop exercise
-incomplete` instead of silently running an incorrect optimizer.
+Each function contains a `PUT YOUR CODE HERE` block and intentionally raises
+`NotImplementedError`. This makes each team’s task explicit, and the program
+reaches the steps in this same order. Running before completing them reports
+`workshop exercise incomplete` instead of silently running an incorrect
+optimizer.
 
 ## 3. Run BayesOpt
 
@@ -63,7 +66,7 @@ GP always receives three inputs: red, green, and blue.
 `src/` directly contains three folders with no intermediate package:
 
 ```text
-bo/      metric, GP prior, and sampling algorithm
+bo/      search space, metric, GP prior, and sampling algorithm
 utils/   shared hardware, campaign, CLI, colors, and artifacts
 web/     only the Color Lab application and its HTML
 ```

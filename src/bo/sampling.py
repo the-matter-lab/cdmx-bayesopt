@@ -1,4 +1,4 @@
-"""Exercise 3: choose the next RGB LED color to sample."""
+"""Step 4: choose the next RGB LED color to sample."""
 
 from __future__ import annotations
 
@@ -30,13 +30,22 @@ def select_next_rgb(
     candidates: np.ndarray,
     exploration: float,
 ) -> np.ndarray:
-    """Select one untested RGB candidate using expected improvement.
+    """Choose the next RGB candidate using expected improvement.
 
-    This campaign minimizes RGB distance, so improvement means a predicted
-    cost below the best cost observed so far. Return one row from candidates.
+    Params:
+        model: Fitted Gaussian-process model.
+        observed_points: RGB values already tested.
+        observed_costs: Distances measured at those points.
+        candidates: RGB values available to test next.
+        exploration: Exploration allowance for expected improvement.
+
+    Returns:
+        One RGB row from ``candidates``.
     """
 
-    # Put your solution here.
+    ######################
+    # PUT YOUR CODE HERE
+    ######################
     raise NotImplementedError(
         "Put your solution here: implement select_next_rgb() in bo/sampling.py"
     )

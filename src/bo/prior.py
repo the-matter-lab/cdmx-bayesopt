@@ -1,4 +1,4 @@
-"""Exercise 2: define a Gaussian-process prior covariance."""
+"""Step 3: define a Gaussian-process prior covariance."""
 
 from __future__ import annotations
 
@@ -15,14 +15,20 @@ def gaussian_process_prior(
     right: np.ndarray,
     length_scale: float,
 ) -> np.ndarray:
-    """Return the RBF covariance between two sets of RGB points.
+    """Build the RBF covariance for the Gaussian-process prior.
 
-    The returned matrix must have shape ``(len(left), len(right))``. This
-    covariance function is the prior assumption that nearby LED colors tend
-    to have similar sensor costs.
+    Params:
+        left: First RGB array with shape ``(n, 3)``.
+        right: Second RGB array with shape ``(m, 3)``.
+        length_scale: Distance over which colors remain similar.
+
+    Returns:
+        Covariance matrix with shape ``(n, m)``.
     """
 
-    # Put your solution here.
+    ######################
+    # PUT YOUR CODE HERE
+    ######################
     raise NotImplementedError(
         "Put your solution here: implement gaussian_process_prior() in bo/prior.py"
     )

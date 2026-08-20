@@ -1,18 +1,25 @@
-"""Exercise 1: define the color-matching cost."""
+"""Step 2: define the color-matching cost."""
 
 from __future__ import annotations
 
-from utils.hardware import RGB
 
+def rgb_distance(
+    target_rgb: tuple[int, int, int],
+    measured_rgb: tuple[int, int, int],
+) -> float:
+    """Calculate the Euclidean distance between two RGB colors.
 
-def rgb_distance(target_rgb: RGB, measured_rgb: RGB) -> float:
-    """Return the Euclidean distance between target and measured RGB.
+    Params:
+        target_rgb: Desired 8-bit RGB color.
+        measured_rgb: RGB color reported by the sensor.
 
-    A perfect match has cost 0. The largest possible 8-bit RGB distance is
-    ``sqrt(3 * 255**2)``. Bayesian optimization will minimize this value.
+    Returns:
+        RGB distance; lower is better.
     """
 
-    # Put your solution here.
+    ######################
+    # PUT YOUR CODE HERE
+    ######################
     raise NotImplementedError(
         "Put your solution here: implement rgb_distance() in bo/metric.py"
     )

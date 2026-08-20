@@ -30,19 +30,22 @@ intensidad del LED, ver las lecturas RGB del sensor, limpiar el historial y
 ajustar el máximo de la gráfica. `Ctrl-C` detiene el sitio y el muestreo. Color
 Lab funciona de manera independiente a los ejercicios de BayesOpt.
 
-## 2. Completar los tres ejercicios
+## 2. Completar los cuatro pasos
 
 Los únicos conceptos de BayesOpt viven en `src/bo/`:
 
-1. [`metric.py`](src/bo/metric.py): implementar la distancia RGB.
-2. [`prior.py`](src/bo/prior.py): implementar el prior RBF del
+1. [`search_space.py`](src/bo/search_space.py): definir los límites de rojo,
+   verde y azul.
+2. [`metric.py`](src/bo/metric.py): implementar la distancia RGB.
+3. [`prior.py`](src/bo/prior.py): implementar el prior RBF del
    proceso gaussiano.
-3. [`sampling.py`](src/bo/sampling.py): elegir la siguiente
+4. [`sampling.py`](src/bo/sampling.py): elegir la siguiente
    muestra con expected improvement.
 
-Cada función contiene `Put your solution here` y lanza
+Cada función contiene un bloque `PUT YOUR CODE HERE` y lanza
 `NotImplementedError` intencionalmente. Esto permite que cada equipo vea con
-claridad qué debe completar. Al ejecutar antes de resolverlas aparece
+claridad qué debe completar. El programa encuentra los pasos en ese mismo
+orden. Al ejecutar antes de resolverlos aparece
 `workshop exercise incomplete` en lugar de comenzar una campaña incorrecta.
 
 ## 3. Ejecutar BayesOpt
@@ -63,7 +66,7 @@ siempre recibe tres entradas: rojo, verde y azul.
 Dentro de `src/` hay directamente tres carpetas y ningún paquete intermedio:
 
 ```text
-bo/      métrica, prior GP y algoritmo de muestreo
+bo/      espacio de búsqueda, métrica, prior GP y muestreo
 utils/   hardware, campaña, CLI, colores y artefactos compartidos
 web/     únicamente la aplicación Color Lab y su HTML
 ```

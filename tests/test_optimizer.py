@@ -4,7 +4,9 @@ import csv
 import json
 import tempfile
 import unittest
+from inspect import getdoc
 from pathlib import Path
+from typing import get_type_hints
 from unittest import mock
 
 import numpy as np
@@ -12,6 +14,7 @@ import numpy as np
 from bo.metric import rgb_distance
 from bo.prior import GaussianProcess, gaussian_process_prior
 from bo.sampling import select_next_rgb
+from bo.search_space import rgb_search_space
 from utils.artifacts import write_history, write_summary
 from utils.campaign import (
     OptimizationConfig,
@@ -36,6 +39,10 @@ def test_sampler(_model, _points, _costs, candidates, _exploration):
     return candidates[0]
 
 
+def test_search_space():
+    return (0, 255), (0, 255), (0, 255)
+
+
 class WorkshopExerciseTests(unittest.TestCase):
     def test_source_has_only_web_utils_and_bo_feature_folders(self):
         source = Path(__file__).parents[1] / "src"
@@ -50,10 +57,18 @@ class WorkshopExerciseTests(unittest.TestCase):
         bo_files = sorted(path.name for path in (source / "bo").glob("*.py"))
         self.assertEqual(
             bo_files,
-            ["__init__.py", "metric.py", "prior.py", "sampling.py"],
+            [
+                "__init__.py",
+                "metric.py",
+                "prior.py",
+                "sampling.py",
+                "search_space.py",
+            ],
         )
 
-    def test_all_three_exercises_are_explicit_stubs(self):
+    def test_all_four_steps_are_explicit_stubs(self):
+        with self.assertRaisesRegex(NotImplementedError, "bo/search_space.py"):
+            rgb_search_space()
         with self.assertRaisesRegex(NotImplementedError, "bo/metric.py"):
             rgb_distance((1, 2, 3), (4, 5, 6))
         with self.assertRaisesRegex(NotImplementedError, "bo/prior.py"):
@@ -68,15 +83,50 @@ class WorkshopExerciseTests(unittest.TestCase):
             )
 
         source = Path(__file__).parents[1] / "src" / "bo"
-        for filename in ("metric.py", "prior.py", "sampling.py"):
-            self.assertIn("Put your solution here", (source / filename).read_text())
+        for filename in (
+            "search_space.py",
+            "metric.py",
+            "prior.py",
+            "sampling.py",
+        ):
+            exercise_source = (source / filename).read_text()
+            self.assertIn(
+                "######################\n"
+                "    # PUT YOUR CODE HERE\n"
+                "    ######################",
+                exercise_source,
+            )
+
+    def test_exercise_interfaces_are_short_and_self_contained(self):
+        search_hints = get_type_hints(rgb_search_space)
+        self.assertEqual(
+            search_hints["return"],
+            tuple[tuple[int, int], tuple[int, int], tuple[int, int]],
+        )
+        hints = get_type_hints(rgb_distance)
+        self.assertEqual(hints["target_rgb"], tuple[int, int, int])
+        self.assertEqual(hints["measured_rgb"], tuple[int, int, int])
+        metric_source = (
+            Path(__file__).parents[1] / "src" / "bo" / "metric.py"
+        ).read_text()
+        self.assertNotIn("utils.hardware", metric_source)
+        for exercise in (
+            rgb_search_space,
+            rgb_distance,
+            gaussian_process_prior,
+            select_next_rgb,
+        ):
+            documentation = getdoc(exercise) or ""
+            self.assertIn("Params:", documentation)
+            self.assertIn("Returns:", documentation)
 
     def test_cli_reports_an_incomplete_exercise_without_a_traceback(self):
+        measurement = mock.Mock(return_value=(10, 20, 30))
         with (
             tempfile.TemporaryDirectory() as temporary,
             mock.patch(
                 "utils.cli.measurement_function",
-                return_value=lambda _red, _green, _blue: (10, 20, 30),
+                return_value=measurement,
             ),
             mock.patch("sys.stderr") as stderr,
         ):
@@ -95,7 +145,46 @@ class WorkshopExerciseTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(status, 3)
-        self.assertIn("workshop exercise incomplete", str(stderr.write.call_args_list))
+        error = str(stderr.write.call_args_list)
+        self.assertIn("workshop exercise incomplete", error)
+        self.assertIn("bo/search_space.py", error)
+        measurement.assert_not_called()
+
+    def test_incomplete_steps_surface_in_workshop_order(self):
+        measurement = mock.Mock(return_value=(10, 20, 30))
+        config = OptimizationConfig(
+            total_iterations=3,
+            initial_points=2,
+            candidate_count=100,
+        )
+        with self.assertRaisesRegex(NotImplementedError, "bo/search_space.py"):
+            run_optimization(measurement, (10, 20, 30), config)
+        measurement.assert_not_called()
+
+        with self.assertRaisesRegex(NotImplementedError, "bo/metric.py"):
+            run_optimization(
+                measurement,
+                (10, 20, 30),
+                config,
+                search_space=test_search_space,
+            )
+        with self.assertRaisesRegex(NotImplementedError, "bo/prior.py"):
+            run_optimization(
+                measurement,
+                (10, 20, 30),
+                config,
+                search_space=test_search_space,
+                metric=test_metric,
+            )
+        with self.assertRaisesRegex(NotImplementedError, "bo/sampling.py"):
+            run_optimization(
+                measurement,
+                (10, 20, 30),
+                config,
+                search_space=test_search_space,
+                metric=test_metric,
+                prior=test_covariance,
+            )
 
 
 class GaussianProcessInfrastructureTests(unittest.TestCase):
@@ -123,6 +212,35 @@ class GaussianProcessInfrastructureTests(unittest.TestCase):
 
 
 class CampaignTests(unittest.TestCase):
+    def test_search_space_controls_every_sampled_rgb_channel(self):
+        def narrow_search_space():
+            return (10, 12), (20, 22), (30, 32)
+
+        result = run_optimization(
+            lambda red, green, blue: (red, green, blue),
+            (10, 20, 30),
+            OptimizationConfig(
+                total_iterations=4,
+                initial_points=2,
+                seed=11,
+                candidate_count=100,
+            ),
+            search_space=narrow_search_space,
+            metric=test_metric,
+            prior=test_covariance,
+            sampler=test_sampler,
+        )
+
+        self.assertTrue(
+            np.all((10 <= result.points[:, 0]) & (result.points[:, 0] <= 12))
+        )
+        self.assertTrue(
+            np.all((20 <= result.points[:, 1]) & (result.points[:, 1] <= 22))
+        )
+        self.assertTrue(
+            np.all((30 <= result.points[:, 2]) & (result.points[:, 2] <= 32))
+        )
+
     def test_dependencies_can_be_completed_and_campaign_minimizes_cost(self):
         config = OptimizationConfig(
             total_iterations=5,
@@ -138,6 +256,7 @@ class CampaignTests(unittest.TestCase):
             measurement,
             (0, 0, 0),
             config,
+            search_space=test_search_space,
             metric=test_metric,
             prior=test_covariance,
             sampler=test_sampler,
@@ -146,6 +265,7 @@ class CampaignTests(unittest.TestCase):
             measurement,
             (0, 0, 0),
             config,
+            search_space=test_search_space,
             metric=test_metric,
             prior=test_covariance,
             sampler=test_sampler,
