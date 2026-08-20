@@ -32,12 +32,12 @@ independently of the BayesOpt exercises.
 
 ## 2. Complete the three exercises
 
-The only BayesOpt concepts live under `src/cdmx_bayesopt/bo/`:
+The only BayesOpt concepts live under `src/bo/`:
 
-1. [`metric.py`](src/cdmx_bayesopt/bo/metric.py): implement RGB distance.
-2. [`prior.py`](src/cdmx_bayesopt/bo/prior.py): implement the Gaussian
+1. [`metric.py`](src/bo/metric.py): implement RGB distance.
+2. [`prior.py`](src/bo/prior.py): implement the Gaussian
    process RBF prior.
-3. [`sampling.py`](src/cdmx_bayesopt/bo/sampling.py): choose the next sample
+3. [`sampling.py`](src/bo/sampling.py): choose the next sample
    with expected improvement.
 
 Each function contains `Put your solution here` and intentionally raises
@@ -60,7 +60,7 @@ GP always receives three inputs: red, green, and blue.
 
 ## Code organization
 
-`src/cdmx_bayesopt/` has only three feature folders:
+`src/` directly contains three folders with no intermediate package:
 
 ```text
 bo/      metric, GP prior, and sampling algorithm

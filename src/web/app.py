@@ -14,8 +14,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from urllib.parse import urlsplit
 
-from cdmx_bayesopt.utils.colors import color_hex, parse_rgb_color
-from cdmx_bayesopt.utils.hardware import (
+from utils.colors import color_hex, parse_rgb_color
+from utils.hardware import (
     RGB,
     HardwareBundle,
     build_hardware,
@@ -179,7 +179,7 @@ class ColorLabHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
         if path in ("/", "/index.html"):
-            payload = files("cdmx_bayesopt.web").joinpath("index.html").read_bytes()
+            payload = files("web").joinpath("index.html").read_bytes()
             self._send_bytes(HTTPStatus.OK, "text/html; charset=utf-8", payload)
             return
         if path == "/api/state":

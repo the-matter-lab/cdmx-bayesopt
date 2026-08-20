@@ -1,4 +1,4 @@
-"""The three Bayesian-optimization exercises for the workshop."""
+"""Three Bayesian-optimization exercises for the workshop."""
 
 from .metric import rgb_distance
 from .prior import GaussianProcess, gaussian_process_prior

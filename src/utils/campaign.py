@@ -7,13 +7,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from cdmx_bayesopt.bo.metric import rgb_distance
-from cdmx_bayesopt.bo.prior import (
+from bo.metric import rgb_distance
+from bo.prior import (
     GaussianProcess,
     PriorFunction,
     gaussian_process_prior,
 )
-from cdmx_bayesopt.bo.sampling import select_next_rgb
+from bo.sampling import select_next_rgb
 
 from .hardware import RGB, validate_rgb
 

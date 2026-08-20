@@ -1,4 +1,4 @@
-"""Exercise 3: choose the next LED color to sample."""
+"""Exercise 3: choose the next RGB LED color to sample."""
 
 from __future__ import annotations
 

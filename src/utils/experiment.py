@@ -1,4 +1,4 @@
-"""Shared hardware measurement used by the BayesOpt campaign."""
+"""Hardware measurement shared with the BayesOpt campaign."""
 
 from __future__ import annotations
 

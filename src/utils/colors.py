@@ -1,4 +1,4 @@
-"""Small color helpers shared by the experiment and web app."""
+"""Color helpers shared by the experiment and web app."""
 
 from __future__ import annotations
 

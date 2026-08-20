@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from cdmx_bayesopt.utils.hardware import RGB
+from utils.hardware import RGB
 
 
 def rgb_distance(target_rgb: RGB, measured_rgb: RGB) -> float:

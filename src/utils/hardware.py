@@ -1,4 +1,4 @@
-"""Shared hardware adapters for the Radxa color experiment.
+"""Hardware adapters shared by the Radxa color experiment.
 
 The module intentionally imports ``smbus`` and ``spidev`` only when real
 hardware is requested. This keeps simulation and unit tests portable.

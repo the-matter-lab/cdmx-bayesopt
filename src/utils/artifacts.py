@@ -1,4 +1,4 @@
-"""CSV, JSON, dashboard, plot, and GIF output for a BayesOpt campaign."""
+"""Write CSV, JSON, dashboard, plot, and GIF campaign output."""
 
 from __future__ import annotations
 

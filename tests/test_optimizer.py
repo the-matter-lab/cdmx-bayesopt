@@ -9,16 +9,16 @@ from unittest import mock
 
 import numpy as np
 
-from cdmx_bayesopt.bo.metric import rgb_distance
-from cdmx_bayesopt.bo.prior import GaussianProcess, gaussian_process_prior
-from cdmx_bayesopt.bo.sampling import select_next_rgb
-from cdmx_bayesopt.utils.artifacts import write_history, write_summary
-from cdmx_bayesopt.utils.campaign import (
+from bo.metric import rgb_distance
+from bo.prior import GaussianProcess, gaussian_process_prior
+from bo.sampling import select_next_rgb
+from utils.artifacts import write_history, write_summary
+from utils.campaign import (
     OptimizationConfig,
     OptimizationResult,
     run_optimization,
 )
-from cdmx_bayesopt.utils.cli import main
+from utils.cli import main
 
 
 def test_covariance(left: np.ndarray, right: np.ndarray, _length: float) -> np.ndarray:
@@ -38,11 +38,13 @@ def test_sampler(_model, _points, _costs, candidates, _exploration):
 
 class WorkshopExerciseTests(unittest.TestCase):
     def test_source_has_only_web_utils_and_bo_feature_folders(self):
-        source = Path(__file__).parents[1] / "src" / "cdmx_bayesopt"
+        source = Path(__file__).parents[1] / "src"
         folders = sorted(
             path.name
             for path in source.iterdir()
-            if path.is_dir() and not path.name.startswith("__")
+            if path.is_dir()
+            and not path.name.startswith("__")
+            and not path.name.endswith(".egg-info")
         )
         self.assertEqual(folders, ["bo", "utils", "web"])
         bo_files = sorted(path.name for path in (source / "bo").glob("*.py"))
@@ -65,7 +67,7 @@ class WorkshopExerciseTests(unittest.TestCase):
                 0.1,
             )
 
-        source = Path(__file__).parents[1] / "src" / "cdmx_bayesopt" / "bo"
+        source = Path(__file__).parents[1] / "src" / "bo"
         for filename in ("metric.py", "prior.py", "sampling.py"):
             self.assertIn("Put your solution here", (source / filename).read_text())
 
@@ -73,7 +75,7 @@ class WorkshopExerciseTests(unittest.TestCase):
         with (
             tempfile.TemporaryDirectory() as temporary,
             mock.patch(
-                "cdmx_bayesopt.utils.cli.measurement_function",
+                "utils.cli.measurement_function",
                 return_value=lambda _red, _green, _blue: (10, 20, 30),
             ),
             mock.patch("sys.stderr") as stderr,

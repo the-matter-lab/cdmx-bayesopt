@@ -1,4 +1,4 @@
-"""Exercise 2: define the Gaussian-process prior covariance."""
+"""Exercise 2: define a Gaussian-process prior covariance."""
 
 from __future__ import annotations
 

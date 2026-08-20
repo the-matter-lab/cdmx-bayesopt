@@ -32,12 +32,12 @@ Lab funciona de manera independiente a los ejercicios de BayesOpt.
 
 ## 2. Completar los tres ejercicios
 
-Los únicos conceptos de BayesOpt viven en `src/cdmx_bayesopt/bo/`:
+Los únicos conceptos de BayesOpt viven en `src/bo/`:
 
-1. [`metric.py`](src/cdmx_bayesopt/bo/metric.py): implementar la distancia RGB.
-2. [`prior.py`](src/cdmx_bayesopt/bo/prior.py): implementar el prior RBF del
+1. [`metric.py`](src/bo/metric.py): implementar la distancia RGB.
+2. [`prior.py`](src/bo/prior.py): implementar el prior RBF del
    proceso gaussiano.
-3. [`sampling.py`](src/cdmx_bayesopt/bo/sampling.py): elegir la siguiente
+3. [`sampling.py`](src/bo/sampling.py): elegir la siguiente
    muestra con expected improvement.
 
 Cada función contiene `Put your solution here` y lanza
@@ -60,7 +60,7 @@ siempre recibe tres entradas: rojo, verde y azul.
 
 ## Organización del código
 
-Dentro de `src/cdmx_bayesopt/` hay solamente tres carpetas funcionales:
+Dentro de `src/` hay directamente tres carpetas y ningún paquete intermedio:
 
 ```text
 bo/      métrica, prior GP y algoritmo de muestreo

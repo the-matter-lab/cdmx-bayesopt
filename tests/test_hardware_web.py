@@ -10,9 +10,9 @@ import urllib.request
 from pathlib import Path
 from unittest import mock
 
-from cdmx_bayesopt.utils import experiment
-from cdmx_bayesopt.utils.colors import parse_rgb_color, reflected_rgb
-from cdmx_bayesopt.utils.hardware import (
+from utils import experiment
+from utils.colors import parse_rgb_color, reflected_rgb
+from utils.hardware import (
     TCS34725,
     ColorReading,
     HardwareBundle,
@@ -24,7 +24,7 @@ from cdmx_bayesopt.utils.hardware import (
     validate_brightness,
     validate_rgb,
 )
-from cdmx_bayesopt.web.app import ColorLab, ColorLabServer, color_hex, parse_hex_color
+from web.app import ColorLab, ColorLabServer, color_hex, parse_hex_color
 
 
 class FakeBus:
