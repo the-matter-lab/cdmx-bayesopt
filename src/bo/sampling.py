@@ -46,6 +46,15 @@ def select_next_rgb(
     ######################
     # PUT YOUR CODE HERE
     ######################
-    raise NotImplementedError(
-        "Put your solution here: implement select_next_rgb() in bo/sampling.py"
-    )
+    mean = ...
+    deviation = ...
+    improvement = ...
+    acquisition = ...
+    next_index = ...
+
+    required_values = (mean, deviation, improvement, acquisition, next_index)
+    if any(value is Ellipsis for value in required_values):
+        raise NotImplementedError(
+            "Put your solution here: implement select_next_rgb() in bo/sampling.py"
+        )
+    return candidates[int(next_index)].copy()

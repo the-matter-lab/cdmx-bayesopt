@@ -120,6 +120,22 @@ class WorkshopExerciseTests(unittest.TestCase):
             self.assertIn("Params:", documentation)
             self.assertIn("Returns:", documentation)
 
+    def test_harder_steps_name_intermediate_values_without_formulas(self):
+        source = Path(__file__).parents[1] / "src" / "bo"
+        prior_source = (source / "prior.py").read_text()
+        sampling_source = (source / "sampling.py").read_text()
+
+        for placeholder in ("squared_distance = ...", "covariance = ..."):
+            self.assertIn(placeholder, prior_source)
+        for placeholder in (
+            "mean = ...",
+            "deviation = ...",
+            "improvement = ...",
+            "acquisition = ...",
+            "next_index = ...",
+        ):
+            self.assertIn(placeholder, sampling_source)
+
     def test_cli_reports_an_incomplete_exercise_without_a_traceback(self):
         measurement = mock.Mock(return_value=(10, 20, 30))
         with (

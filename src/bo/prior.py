@@ -29,9 +29,14 @@ def gaussian_process_prior(
     ######################
     # PUT YOUR CODE HERE
     ######################
-    raise NotImplementedError(
-        "Put your solution here: implement gaussian_process_prior() in bo/prior.py"
-    )
+    squared_distance = ...
+    covariance = ...
+
+    if any(value is Ellipsis for value in (squared_distance, covariance)):
+        raise NotImplementedError(
+            "Put your solution here: implement gaussian_process_prior() in bo/prior.py"
+        )
+    return np.asarray(covariance, dtype=float)
 
 
 @dataclass
